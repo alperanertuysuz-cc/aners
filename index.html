@@ -1,0 +1,2235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lumen 550</title>
+<meta name="description" content="LUMEN/550 is a concept deep-space mission that uses the Sun's gravity as a telescope lens: live WebGL lens lab, NASA visualization feeds and flight spec.">
+<meta name="theme-color" content="#04050A">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2304050A'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%235EF2E4' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23FFB547'/%3E%3Ccircle cx='26' cy='16' r='1.8' fill='%235EF2E4'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&family=Instrument+Serif:ital@0;1&display=swap">
+
+<!-- Tailwind CSS (official browser CDN build) -->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3/dist/index.global.js"></script>
+<style type="text/tailwindcss">
+  @theme {
+    --color-void: #04050A;
+    --color-deep: #0A0D18;
+    --color-ink: #EAF0FA;
+    --color-mute: #8C97AE;
+    --color-dim: #5B6479;
+    --color-oiii: #5EF2E4;
+    --color-ha: #FFB547;
+    --color-sii: #FF5E7E;
+    --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-display: "Instrument Serif", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+</style>
+
+<style>
+  /* ============ Tokens — palette mapped to the Hubble narrowband set ============ */
+  :root {
+    color-scheme: dark;
+    --void: #04050A;          /* ground */
+    --deep: #0A0D18;          /* raised surface */
+    --ink: #EAF0FA;           /* primary text */
+    --mute: #8C97AE;          /* secondary text */
+    --dim: #5B6479;           /* tertiary text */
+    --oiii: #5EF2E4;          /* [O III] 500.7 nm — primary neon */
+    --ha: #FFB547;            /* H-alpha, HST-palette gold */
+    --sii: #FF5E7E;           /* [S II] 671.6 nm — rose */
+    --line: rgba(170, 195, 255, .11);
+    --line-2: rgba(170, 195, 255, .2);
+    --acc: var(--oiii);
+    --ease: cubic-bezier(.16, 1, .3, 1);
+    --r-xl: 30px;
+    --r-lg: 22px;
+    --r-md: 14px;
+    --f-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --f-serif: "Instrument Serif", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --f-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  html { background: var(--void); overflow-x: clip; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; min-height: 100%;
+    background: var(--void); color: var(--ink);
+    font-family: var(--f-sans); font-size: 16px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    overflow-x: clip;
+  }
+  @media (prefers-reduced-motion: no-preference) { body { animation: pagein .9s ease .05s both; } }
+  @keyframes pagein { from { opacity: 0; } to { opacity: 1; } }
+  ::selection { background: rgba(94, 242, 228, .28); color: #fff; }
+  button, [role="button"], label[for], .switch, .preset { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--acc); outline-offset: 3px; }
+  h1, h2, h3 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+
+  /* Lenis */
+  html.lenis, html.lenis body { height: auto; }
+  .lenis.lenis-smooth { scroll-behavior: auto !important; }
+  .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+  .lenis.lenis-stopped { overflow: hidden; }
+
+  .skip { position: fixed; left: 16px; top: -60px; z-index: 300; padding: 10px 16px; border-radius: 999px; background: var(--oiii); color: #04110F; font-weight: 600; transition: top .3s var(--ease); }
+  .skip:focus { top: 16px; }
+
+  /* ============ Ambient liquid atmosphere ============ */
+  .atmos { position: fixed; inset: 0; z-index: -10; pointer-events: none; overflow: hidden; background: var(--void); }
+  .blob { position: absolute; width: 72vmax; height: 72vmax; border-radius: 50%; will-change: transform; }
+  .blob-a { left: -30vmax; top: -18vmax; background: radial-gradient(circle, rgba(94, 242, 228, .13), transparent 62%); animation: drift-a 26s ease-in-out infinite alternate; }
+  .blob-b { right: -32vmax; top: 18vh; background: radial-gradient(circle, rgba(255, 181, 71, .09), transparent 62%); animation: drift-b 32s ease-in-out infinite alternate; }
+  .blob-c { left: 10vw; bottom: -48vmax; background: radial-gradient(circle, rgba(255, 94, 126, .08), transparent 62%); animation: drift-c 38s ease-in-out infinite alternate; }
+  @keyframes drift-a { to { transform: translate3d(18vmax, 22vmax, 0) scale(1.15); } }
+  @keyframes drift-b { to { transform: translate3d(-20vmax, 16vmax, 0) scale(.9); } }
+  @keyframes drift-c { to { transform: translate3d(22vmax, -14vmax, 0) scale(1.2); } }
+  .atmos::after {
+    content: ""; position: absolute; inset: 0; opacity: .06;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ============ Shared primitives ============ */
+  .wrap { width: 100%; max-width: 1320px; margin-inline: auto; padding-inline: 16px; }
+  @media (min-width: 640px) { .wrap { padding-inline: 24px; } }
+  @media (min-width: 1024px) { .wrap { padding-inline: 40px; } }
+
+  .glass {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .02)), rgba(10, 13, 24, .42);
+    border: 1px solid var(--line);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    backdrop-filter: blur(20px) saturate(150%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 30px 80px -40px rgba(0, 0, 0, .85);
+  }
+  .mono-label { font: 500 11px/1.2 var(--f-mono); letter-spacing: .16em; text-transform: uppercase; color: #9FACC4; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 12px; font: 500 11.5px/1 var(--f-mono); letter-spacing: .17em; text-transform: uppercase; color: #A9B6CE; }
+  .eyebrow-wrap { flex-wrap: wrap; row-gap: 10px; }
+  .eyebrow-wrap > span { white-space: nowrap; }
+  .eyebrow .tick { width: 22px; height: 1px; background: linear-gradient(90deg, var(--acc), transparent); }
+  .orbit-ico { position: relative; width: 14px; height: 14px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--acc) 70%, transparent); }
+  .orbit-ico::after { content: ""; position: absolute; left: 50%; top: -2.5px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--ha); box-shadow: 0 0 8px var(--ha); transform-origin: 2px 9.5px; animation: orbit 3.2s linear infinite; }
+  @keyframes orbit { to { transform: rotate(360deg); } }
+
+  .display { font-family: var(--f-serif); font-weight: 400; letter-spacing: -.02em; line-height: .92; }
+  .h-section { font-size: clamp(2.7rem, 6.4vw, 5.8rem); line-height: .96; }
+  .h-section em, .grad-em { font-style: italic; color: transparent; background: linear-gradient(95deg, var(--acc), #CFFFF9 38%, var(--ha) 78%); -webkit-background-clip: text; background-clip: text; padding-right: .06em; }
+  .lede { max-width: 38rem; color: #A5B0C6; font-size: clamp(1rem, 1.25vw, 1.125rem); line-height: 1.68; }
+
+  .section { position: relative; padding-block: clamp(88px, 11vw, 150px); }
+  .section.section-tight { padding-top: 0; }
+  [tabindex="-1"]:focus { outline: none; }
+  .section-head { display: grid; gap: 22px; align-items: end; }
+  @media (min-width: 900px) { .section-head { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 48px; } }
+
+  /* Buttons */
+  .btn {
+    position: relative; isolation: isolate; overflow: hidden;
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    height: 50px; padding-inline: 22px; border-radius: 999px;
+    font: 500 15px/1 var(--f-sans); letter-spacing: -.005em; white-space: nowrap;
+    transition: transform .55s var(--ease), box-shadow .5s var(--ease), background .4s, border-color .4s, color .3s;
+    will-change: transform;
+  }
+  .btn svg { width: 16px; height: 16px; flex: none; transition: transform .5s var(--ease); }
+  .btn:hover svg.arrow { transform: translateX(3px); }
+  .btn:active { transform: scale(.97); }
+  .btn-glow {
+    color: #03120F;
+    background: linear-gradient(115deg, var(--oiii) 0%, #B9FFF7 45%, var(--ha) 100%);
+    box-shadow: 0 0 0 1px rgba(94, 242, 228, .55), 0 12px 36px -10px rgba(94, 242, 228, .65), 0 0 70px -14px rgba(255, 181, 71, .55);
+  }
+  .btn-glow::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .75) 50%, transparent 70%); transform: translateX(-120%); transition: transform 1s var(--ease); }
+  .btn-glow:hover::after { transform: translateX(120%); }
+  .btn-glow:hover { box-shadow: 0 0 0 1px rgba(94, 242, 228, .8), 0 16px 50px -8px rgba(94, 242, 228, .8), 0 0 90px -10px rgba(255, 181, 71, .7); }
+  .btn-ghost { color: var(--ink); background: rgba(255, 255, 255, .045); border: 1px solid var(--line-2); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+  .btn-ghost:hover { background: rgba(255, 255, 255, .09); border-color: rgba(94, 242, 228, .5); }
+  .btn-sm { height: 40px; padding-inline: 16px; font-size: 13.5px; }
+  .icon-btn { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--ink); background: rgba(8, 10, 19, .55); border: 1px solid var(--line-2); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: background .3s, border-color .3s, transform .4s var(--ease); }
+  .icon-btn:hover { background: color-mix(in srgb, var(--acc) 16%, rgba(8, 10, 19, .55)); border-color: color-mix(in srgb, var(--acc) 55%, transparent); }
+  .icon-btn:active { transform: scale(.92); }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  /* ============ Navigation ============ */
+  .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 60; padding-top: calc(env(safe-area-inset-top, 0px) + 12px); pointer-events: none; }
+  .nav-bar {
+    position: relative; pointer-events: auto;
+    height: 60px; border-radius: 999px; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 18px;
+    background: rgba(10, 13, 24, .36); border: 1px solid var(--line);
+    -webkit-backdrop-filter: blur(22px) saturate(160%); backdrop-filter: blur(22px) saturate(160%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 24px 60px -34px rgba(0, 0, 0, .95);
+    transition: background .5s var(--ease), border-color .5s var(--ease);
+  }
+  .nav[data-scrolled="true"] .nav-bar { background: rgba(7, 9, 18, .74); border-color: var(--line-2); }
+  .progress { position: absolute; left: 28px; right: 28px; bottom: -1px; height: 1px; transform-origin: 0 50%; transform: scaleX(0); background: linear-gradient(90deg, var(--oiii), var(--ha), var(--sii)); box-shadow: 0 0 10px rgba(94, 242, 228, .6); }
+  .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: .06em; font-size: 15px; }
+  .brand svg { width: 28px; height: 28px; transition: transform .8s var(--ease); }
+  .brand:hover svg { transform: rotate(-90deg); }
+  .brand small { font: 500 12px/1 var(--f-mono); color: var(--mute); letter-spacing: .04em; }
+  .nav-link { position: relative; padding: 9px 13px; font-size: 14px; color: #B5BFD2; border-radius: 999px; transition: color .3s; }
+  .nav-link::after { content: ""; position: absolute; left: 13px; right: 13px; bottom: 4px; height: 1px; background: var(--oiii); box-shadow: 0 0 8px var(--oiii); transform: scaleX(0); transform-origin: right; transition: transform .55s var(--ease); }
+  .nav-link:hover, .nav-link[aria-current="true"] { color: #fff; }
+  .nav-link:hover::after, .nav-link[aria-current="true"]::after { transform: scaleX(1); transform-origin: left; }
+  .status { position: relative; display: inline-flex; align-items: center; gap: 9px; height: 34px; padding: 0 13px; border-radius: 999px; font: 500 11px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: #C4FBF4; background: rgba(94, 242, 228, .07); border: 1px solid rgba(94, 242, 228, .24); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pulse { position: relative; width: 7px; height: 7px; border-radius: 50%; background: var(--oiii); box-shadow: 0 0 10px var(--oiii); flex: none; }
+  .pulse::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--oiii); animation: ping 2.2s var(--ease) infinite; }
+  @keyframes ping { from { transform: scale(1); opacity: .7; } to { transform: scale(3.2); opacity: 0; } }
+  .menu-btn { width: 44px; height: 44px; border-radius: 50%; display: grid; place-content: center; gap: 5px; border: 1px solid var(--line-2); background: rgba(255, 255, 255, .04); }
+  .menu-btn span { display: block; width: 17px; height: 1.5px; border-radius: 2px; background: var(--ink); transition: transform .5s var(--ease); }
+  .nav[data-menu="open"] .menu-btn span:first-child { transform: translateY(3.25px) rotate(45deg); }
+  .nav[data-menu="open"] .menu-btn span:last-child { transform: translateY(-3.25px) rotate(-45deg); }
+  .status-nav { display: none; }
+  @media (min-width: 768px) { .status-nav { display: inline-flex; } }
+  .nav-cta { display: none; }
+  @media (min-width: 640px) { .nav-cta { display: inline-flex; } }
+  @media (min-width: 1024px) { .menu-btn, .sheet { display: none; } }
+  .sheet { pointer-events: auto; margin-top: 10px; border-radius: 26px; padding: 10px; display: grid; gap: 2px; animation: sheet-in .6s var(--ease) both; }
+  @keyframes sheet-in { from { opacity: 0; transform: translateY(-10px) scale(.98); } }
+  .sheet a:not(.btn) { display: flex; justify-content: space-between; align-items: center; padding: 16px 16px; border-radius: 16px; font-size: 18px; color: var(--ink); transition: background .3s; }
+  .sheet a:not(.btn):hover { background: rgba(255, 255, 255, .05); }
+  .sheet a span { font: 500 11px/1 var(--f-mono); color: var(--dim); letter-spacing: .12em; }
+
+  /* ============ Hero ============ */
+  .hero { position: relative; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; isolation: isolate; }
+  .hero-media { position: absolute; inset: 0; z-index: -4; will-change: transform; }
+  .hero-fallback {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(38% 30% at 50% 42%, rgba(255, 181, 71, .18), transparent 70%),
+      radial-gradient(60% 50% at 20% 20%, rgba(94, 242, 228, .10), transparent 70%),
+      radial-gradient(50% 45% at 85% 70%, rgba(255, 94, 126, .10), transparent 70%),
+      #04050A;
+  }
+  .hero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transform: scale(1.06); transition: opacity 1.8s ease, transform 2.4s var(--ease); }
+  .hero[data-video="ready"] .hero-video { opacity: .82; transform: scale(1); }
+  .hero-shade {
+    position: absolute; inset: 0; z-index: -3; pointer-events: none;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 42%, transparent 0 25%, rgba(4, 5, 10, .5) 70%, rgba(4, 5, 10, .9) 100%),
+      linear-gradient(180deg, rgba(4, 5, 10, .7) 0%, rgba(4, 5, 10, 0) 22%, rgba(4, 5, 10, 0) 45%, rgba(4, 5, 10, .88) 80%, #04050A 100%),
+      linear-gradient(90deg, rgba(4, 5, 10, .72) 0%, rgba(4, 5, 10, .15) 55%, rgba(4, 5, 10, 0) 100%);
+  }
+  @media (max-width: 767px) {
+    .hero-shade { background: radial-gradient(ellipse 90% 50% at 50% 45%, transparent 0 20%, rgba(4, 5, 10, .55) 80%), linear-gradient(180deg, rgba(4, 5, 10, .7) 0%, rgba(4, 5, 10, .3) 25%, rgba(4, 5, 10, .62) 55%, rgba(4, 5, 10, .9) 80%, #04050A 100%); }
+  }
+  #hero-canvas { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; display: block; pointer-events: none; }
+  .hero-content { position: relative; padding-top: 130px; padding-bottom: 92px; }
+  .h-hero { font-size: clamp(3.7rem, 12.2vw, 11.6rem); line-height: .88; letter-spacing: -.028em; margin: 22px 0 0; }
+  .line-mask { display: block; overflow: hidden; padding: 0 .14em .1em 0; margin-bottom: -.1em; }
+  .word { display: inline-block; will-change: transform; }
+  .liquid {
+    font-style: italic; color: transparent;
+    background: linear-gradient(100deg, var(--oiii) 0%, #C9FFF8 20%, var(--ha) 45%, var(--sii) 68%, var(--oiii) 100%);
+    background-size: 300% 100%; -webkit-background-clip: text; background-clip: text;
+    animation: liquid 9s ease-in-out infinite alternate;
+    filter: drop-shadow(0 0 28px rgba(94, 242, 228, .25));
+  }
+  @keyframes liquid { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+  .hero-sub { max-width: 35rem; margin-top: 26px; font-size: clamp(1.02rem, 1.3vw, 1.2rem); line-height: 1.65; color: #B3BDD1; }
+  .chip { padding: 14px 16px; border-radius: 18px; background: rgba(8, 10, 19, .5); border: 1px solid var(--line); transition: border-color .4s, transform .5s var(--ease), background .4s; }
+  @media (min-width: 768px) { .chip { -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); background: rgba(10, 13, 24, .35); } }
+  .chip:hover { border-color: rgba(94, 242, 228, .4); transform: translateY(-3px); background: rgba(94, 242, 228, .06); }
+  .chip dt { font: 500 10.5px/1.2 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: #8795AE; }
+  .chip dd { margin: 6px 0 0; font-size: 17px; font-weight: 500; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+  .hero-card { border-radius: 26px; padding: 20px 20px 16px; animation: floaty 8s ease-in-out infinite; }
+  .hero-card dl { margin: 16px 0 12px; display: grid; gap: 12px; }
+  .hero-card dl div { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .hero-card dt { font-size: 13px; color: #97A3BA; }
+  .hero-card dd { margin: 0; font: 500 15px/1 var(--f-mono); color: #fff; font-variant-numeric: tabular-nums; }
+  .hero-card svg { width: 100%; height: auto; display: block; }
+  .hero-foot { position: absolute; left: 0; right: 0; bottom: 18px; z-index: 2; }
+  .hero-foot-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; font: 500 10.5px/1.3 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: #7D89A1; }
+  .scroll-cue { display: inline-flex; align-items: center; gap: 12px; }
+  .scroll-cue i { position: relative; width: 1px; height: 34px; overflow: hidden; background: rgba(255, 255, 255, .12); }
+  .scroll-cue i::after { content: ""; position: absolute; left: 0; top: 0; width: 1px; height: 12px; background: var(--oiii); box-shadow: 0 0 8px var(--oiii); animation: cue 2.2s var(--ease) infinite; }
+  @keyframes cue { from { transform: translateY(-14px); } to { transform: translateY(36px); } }
+  .motion-btn { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(8, 10, 19, .5); color: #B6C1D6; font: inherit; letter-spacing: inherit; text-transform: inherit; transition: border-color .3s, color .3s; }
+  .motion-btn:hover { border-color: rgba(94, 242, 228, .5); color: #fff; }
+  .motion-btn svg { width: 11px; height: 11px; }
+  .hero[data-paused="true"] .ico-pause-s, .hero:not([data-paused="true"]) .ico-play-s { display: none; }
+
+  /* ============ Marquee ============ */
+  .marquee { position: relative; overflow: hidden; border-block: 1px solid var(--line); padding-block: 18px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+  .marquee-track { display: flex; width: max-content; animation: marquee 70s linear infinite; }
+  .marquee:hover .marquee-track { animation-play-state: paused; }
+  .marquee-track > span { display: inline-flex; align-items: center; gap: 30px; padding-right: 30px; font: 500 12.5px/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: #8D9AB2; white-space: nowrap; }
+  .marquee b { color: var(--ink); font-weight: 500; }
+  .marquee i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--ha); box-shadow: 0 0 8px rgba(255, 181, 71, .6); }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+
+  /* ============ Lens lab ============ */
+  .lab-grid { display: grid; gap: 16px; margin-top: 52px; }
+  @media (min-width: 1024px) { .lab-grid { grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; } }
+  .viewport { position: relative; height: min(122vw, 560px); border-radius: var(--r-xl); overflow: hidden; background: radial-gradient(ellipse at 50% 45%, rgba(94, 242, 228, .07), transparent 60%), #04060C; border: 1px solid var(--line); outline: none; box-shadow: 0 50px 120px -60px rgba(94, 242, 228, .35); }
+  @media (min-width: 1024px) { .viewport { height: auto; min-height: 660px; } }
+  .viewport:focus-visible { box-shadow: 0 0 0 2px var(--acc), 0 50px 120px -60px rgba(94, 242, 228, .35); }
+  .viewport canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .hud { position: absolute; inset: 0; pointer-events: none; font: 500 10.5px/1.6 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: #8FA0BA; font-variant-numeric: tabular-nums; }
+  .hud strong { color: var(--ink); font-weight: 500; }
+  .hud .acc { color: var(--acc); }
+  .hud-tl { position: absolute; top: 20px; left: 22px; }
+  .hud-tr { position: absolute; top: 20px; right: 22px; text-align: right; }
+  .hud-bl { position: absolute; bottom: 20px; left: 22px; }
+  .hud-br { position: absolute; bottom: 16px; right: 16px; display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+  .hud-hint { margin-right: 6px; }
+  @media (max-width: 520px) { .hud-hint { display: none; } .hud-tr { display: none; } }
+  .corner { position: absolute; width: 18px; height: 18px; border: 0 solid color-mix(in srgb, var(--acc) 60%, transparent); }
+  .corner.c1 { top: 10px; left: 10px; border-top-width: 1px; border-left-width: 1px; border-top-left-radius: 8px; }
+  .corner.c2 { top: 10px; right: 10px; border-top-width: 1px; border-right-width: 1px; border-top-right-radius: 8px; }
+  .corner.c3 { bottom: 10px; left: 10px; border-bottom-width: 1px; border-left-width: 1px; border-bottom-left-radius: 8px; }
+  .corner.c4 { bottom: 10px; right: 10px; border-bottom-width: 1px; border-right-width: 1px; border-bottom-right-radius: 8px; }
+  .crosshair { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; opacity: .25; }
+  .crosshair::before, .crosshair::after { content: ""; position: absolute; background: var(--acc); }
+  .crosshair::before { left: 50%; top: 0; bottom: 0; width: 1px; }
+  .crosshair::after { top: 50%; left: 0; right: 0; height: 1px; }
+  .webgl-off { position: absolute; inset: 0; display: none; place-items: center; text-align: center; padding: 24px; color: var(--mute); }
+  html[data-webgl="off"] .webgl-off { display: grid; }
+  html[data-webgl="off"] .hud { display: none; }
+
+  .panel { border-radius: var(--r-xl); padding: 22px; display: flex; flex-direction: column; gap: 20px; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; }
+  .live-pill { display: inline-flex; align-items: center; gap: 8px; font: 500 10.5px/1 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--acc); }
+  .live-pill .pulse { background: var(--acc); box-shadow: 0 0 10px var(--acc); }
+  .live-pill .pulse::after { background: var(--acc); }
+  .ctl { display: grid; gap: 10px; border: 0; margin: 0; padding: 0; min-width: 0; }
+  .ctl-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .ctl-label { font-size: 13px; color: #C7D0E0; padding: 0; }
+  .ctl output { font: 500 12px/1 var(--f-mono); color: var(--acc); font-variant-numeric: tabular-nums; text-align: right; }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); padding: 4px; gap: 4px; border-radius: 14px; background: rgba(255, 255, 255, .035); border: 1px solid var(--line); }
+  .seg input, .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+  .seg label { text-align: center; padding: 9px 6px; border-radius: 10px; font-size: 13px; color: #AEB8CB; transition: background .35s, color .3s, box-shadow .35s; }
+  .seg label:hover { color: #fff; }
+  .seg input:checked + label { background: color-mix(in srgb, var(--acc) 15%, transparent); color: #fff; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acc) 55%, transparent), 0 0 22px -6px var(--acc); }
+  .seg input:focus-visible + label { outline: 2px solid var(--acc); outline-offset: 2px; }
+
+  .range { -webkit-appearance: none; appearance: none; width: 100%; height: 24px; margin: 0; background: transparent; --fill: 50%; }
+  .range:focus-visible { outline: 2px solid var(--acc); outline-offset: 4px; border-radius: 8px; }
+  .range::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: linear-gradient(90deg, var(--acc) 0 var(--fill), rgba(255, 255, 255, .1) var(--fill) 100%); }
+  .range::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -7px; border-radius: 50%; background: #fff; border: 3px solid #070A12; box-shadow: 0 0 0 1.5px var(--acc), 0 0 18px var(--acc); transition: transform .25s var(--ease); }
+  .range:active::-webkit-slider-thumb { transform: scale(1.25); }
+  .range::-moz-range-track { height: 4px; border-radius: 99px; background: rgba(255, 255, 255, .1); }
+  .range::-moz-range-progress { height: 4px; border-radius: 99px; background: var(--acc); }
+  .range::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 3px solid #070A12; box-shadow: 0 0 0 1.5px var(--acc), 0 0 18px var(--acc); }
+  .range-temp::-webkit-slider-runnable-track, .range-hue::-webkit-slider-runnable-track { background: var(--track); }
+  .range-temp::-moz-range-track, .range-hue::-moz-range-track { background: var(--track); }
+  .range-temp::-moz-range-progress, .range-hue::-moz-range-progress { background: transparent; }
+  .range-hue { --track: linear-gradient(90deg, hsl(0 85% 66%), hsl(60 85% 66%), hsl(120 85% 66%), hsl(180 85% 66%), hsl(240 85% 66%), hsl(300 85% 66%), hsl(360 85% 66%)); }
+  .class-scale { position: relative; height: 12px; font: 500 10px/1 var(--f-mono); color: var(--dim); }
+  .class-scale span { position: absolute; top: 0; transform: translateX(-50%); }
+  .switches { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .switch { position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .03); border: 1px solid var(--line); font-size: 13px; color: #C6CFDF; transition: border-color .3s, background .3s; }
+  .switch:hover { border-color: var(--line-2); background: rgba(255, 255, 255, .05); }
+  .switch-ui { position: relative; flex: none; width: 30px; height: 18px; border-radius: 99px; background: rgba(255, 255, 255, .13); transition: background .35s, box-shadow .35s; }
+  .switch-ui::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: transform .45s var(--ease), background .3s; }
+  .switch input:checked + .switch-ui { background: var(--acc); box-shadow: 0 0 14px -2px var(--acc); }
+  .switch input:checked + .switch-ui::after { transform: translateX(12px); background: #04110F; }
+  .switch input:focus-visible + .switch-ui { outline: 2px solid var(--acc); outline-offset: 2px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .preset { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255, 255, 255, .03); font-size: 12.5px; color: #C6CFDF; transition: border-color .3s, background .3s, color .3s, transform .4s var(--ease); }
+  .preset:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--acc) 50%, transparent); }
+  .preset i { width: 8px; height: 8px; border-radius: 50%; background: var(--c, #fff); box-shadow: 0 0 10px var(--c, #fff); }
+  .preset small { font: 500 10px/1 var(--f-mono); color: var(--dim); }
+  .preset[aria-pressed="true"] { border-color: var(--acc); color: #fff; background: color-mix(in srgb, var(--acc) 13%, transparent); }
+  .panel-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: auto; }
+
+  /* ============ Feeds ============ */
+  .feeds-grid { display: grid; gap: 16px; margin-top: 52px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 640px) { .feeds-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .feed-xl { grid-column: span 2; } }
+  @media (min-width: 1024px) { .feeds-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 270px; } .feed-xl { grid-column: span 2; grid-row: span 2; } }
+  .feed { position: relative; isolation: isolate; overflow: hidden; border-radius: var(--r-lg); background: #060810; border: 1px solid var(--line); aspect-ratio: 4 / 3; transition: transform .7s var(--ease), border-color .45s, box-shadow .7s var(--ease); }
+  @media (min-width: 640px) { .feed-xl { aspect-ratio: 16 / 9; } }
+  @media (min-width: 1024px) { .feed, .feed-xl { aspect-ratio: auto; } }
+  .feed:hover, .feed:focus-within { transform: translateY(-5px); border-color: rgba(94, 242, 228, .38); box-shadow: 0 34px 80px -34px rgba(94, 242, 228, .38), 0 0 0 1px rgba(94, 242, 228, .12); }
+  .feed video { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; max-width: none; object-fit: cover; opacity: 0; transform: scale(1.06); transition: opacity .9s ease, transform 1.4s var(--ease); }
+  .feed[data-state="ready"] video { opacity: .62; }
+  .feed[data-playing="true"] video { opacity: 1; transform: scale(1); }
+  .feed[data-state="offline"] video { display: none; }
+  .feed-shade { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(180deg, rgba(4, 5, 10, .5) 0%, rgba(4, 5, 10, 0) 30%, rgba(4, 5, 10, 0) 45%, rgba(4, 5, 10, .92) 100%); }
+  .feed-open { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; background: transparent; border: 0; border-radius: inherit; }
+  .feed-open:focus-visible { outline: 2px solid var(--oiii); outline-offset: -4px; }
+  .feed-top { position: absolute; top: 14px; left: 14px; right: 14px; z-index: 4; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge { display: inline-flex; align-items: center; gap: 7px; height: 25px; padding: 0 10px; border-radius: 999px; font: 500 10px/1 var(--f-mono); letter-spacing: .11em; text-transform: uppercase; color: #D5DDEB; background: rgba(4, 5, 10, .55); border: 1px solid rgba(255, 255, 255, .13); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .badge-sim { color: #04110F; background: var(--oiii); border-color: transparent; box-shadow: 0 0 18px -2px rgba(94, 242, 228, .7); }
+  .badge-sim i { width: 6px; height: 6px; border-radius: 50%; background: #04110F; }
+  .feed[data-playing="true"] .badge-sim i { animation: blink 1.2s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .feed[data-state="offline"] .badge-sim { background: rgba(255, 94, 126, .18); color: #FFC2CE; border-color: rgba(255, 94, 126, .45); box-shadow: none; }
+  .feed[data-state="offline"] .badge-sim i { background: var(--sii); }
+  .play { position: absolute; z-index: 5; left: 50%; top: 46%; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: rgba(8, 10, 19, .42); border: 1px solid rgba(255, 255, 255, .2); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); transition: transform .6s var(--ease), opacity .45s, background .4s, border-color .4s, box-shadow .5s; }
+  .feed-xl .play { width: 92px; height: 92px; margin: -46px 0 0 -46px; }
+  .feed:hover .play, .play:focus-visible { transform: scale(1.08); background: rgba(94, 242, 228, .16); border-color: rgba(94, 242, 228, .6); box-shadow: 0 0 40px -6px rgba(94, 242, 228, .6); }
+  .feed[data-pinned="true"] .play { opacity: 0; transform: scale(.85); }
+  .feed[data-pinned="true"]:hover .play, .feed[data-pinned="true"] .play:focus-visible { opacity: 1; transform: scale(1); }
+  .feed[data-state="offline"] .play { display: none; }
+  .play-ring { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); transform: rotate(-90deg); pointer-events: none; }
+  .play-ring circle { fill: none; stroke-width: 1.5; }
+  .play-ring .track { stroke: rgba(255, 255, 255, .08); }
+  .play-ring .prog { stroke: var(--oiii); stroke-linecap: round; stroke-dasharray: 213.63; stroke-dashoffset: 213.63; filter: drop-shadow(0 0 4px var(--oiii)); transition: stroke-dashoffset .25s linear; }
+  .play .ico { width: 22px; height: 22px; fill: currentColor; }
+  .feed-xl .play .ico { width: 26px; height: 26px; }
+  .play .ico-pause, .feed[data-pinned="true"] .play .ico-play { display: none; }
+  .feed[data-pinned="true"] .play .ico-pause { display: block; }
+  .feed-meta { position: absolute; left: 18px; right: 18px; bottom: 16px; z-index: 4; pointer-events: none; }
+  .feed-kicker { font: 500 10.5px/1.3 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: #8FA0BA; }
+  .feed-title { margin-top: 6px; font-size: clamp(1.7rem, 2.3vw, 2.2rem); line-height: 1; }
+  .feed-xl .feed-title { font-size: clamp(2.2rem, 4vw, 3.6rem); }
+  .feed-desc { margin-top: 10px; max-width: 34rem; font-size: 14px; line-height: 1.55; color: #AEB9CD; }
+  @media (min-width: 1024px) { .feed:not(.feed-xl) .feed-desc { display: none; } }
+
+  /* Offline / pre-load renders (pure CSS) */
+  .sim { position: absolute; inset: 0; z-index: 0; overflow: hidden; background: radial-gradient(ellipse at 50% 50%, rgba(94, 242, 228, .06), transparent 60%), #05070D; }
+  .sim .anim { animation-play-state: paused !important; }
+  .feed[data-state="loading"] .sim .anim, .feed[data-state="offline"] .sim .anim { animation-play-state: running !important; }
+  .sim-stage { position: absolute; left: 50%; top: 42%; width: min(80%, 420px); aspect-ratio: 1; transform: translate(-50%, -50%); perspective: 900px; }
+  .disk { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, rgba(255, 181, 71, .05), rgba(255, 196, 120, .95), rgba(255, 94, 126, .6) 22%, rgba(255, 181, 71, .1) 40%, rgba(255, 240, 210, .95) 58%, rgba(255, 150, 70, .35) 78%, rgba(255, 181, 71, .05)); -webkit-mask: radial-gradient(circle, transparent 0 27%, #000 31% 46%, transparent 70%); mask: radial-gradient(circle, transparent 0 27%, #000 31% 46%, transparent 70%); animation: disk 8s linear infinite; }
+  @keyframes disk { from { transform: rotateX(76deg) rotateZ(0deg); } to { transform: rotateX(76deg) rotateZ(360deg); } }
+  .bh-halo { position: absolute; left: 50%; top: 50%; width: 44%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, transparent 54%, rgba(255, 225, 170, .95) 59%, rgba(255, 150, 70, .4) 66%, transparent 74%); }
+  .bh-core { position: absolute; left: 50%; top: 50%; width: 25%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; background: #000; box-shadow: 0 0 0 1.5px rgba(255, 220, 160, .9), 0 0 34px 8px rgba(255, 181, 71, .45); }
+  .globe { position: absolute; left: 50%; top: 42%; width: min(50%, 280px); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; overflow: hidden; box-shadow: 0 0 46px 6px var(--atm), inset 0 0 18px rgba(255, 255, 255, .15); }
+  .globe .surface { position: absolute; left: 0; top: 0; width: 200%; height: 100%; background-size: 50% 100%; background-repeat: repeat-x; animation: spin-tex 16s linear infinite; }
+  @keyframes spin-tex { to { transform: translateX(-50%); } }
+  .globe .shade { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 30% 28%, rgba(255, 255, 255, .22), transparent 38%), radial-gradient(circle at 68% 62%, transparent 28%, rgba(0, 0, 0, .8) 72%); }
+  .g-earth { --atm: rgba(110, 190, 255, .45); }
+  .g-earth .surface { background-image: radial-gradient(ellipse 16% 5% at 30% 20%, rgba(255, 255, 255, .6), transparent 70%), radial-gradient(ellipse 20% 5% at 70% 56%, rgba(255, 255, 255, .5), transparent 70%), radial-gradient(ellipse 13% 4% at 14% 78%, rgba(255, 255, 255, .45), transparent 70%), radial-gradient(ellipse 11% 4% at 58% 84%, rgba(255, 255, 255, .4), transparent 70%), radial-gradient(ellipse 16% 24% at 18% 38%, #3f8f5a 55%, transparent 62%), radial-gradient(ellipse 10% 28% at 38% 64%, #4f8a46 55%, transparent 62%), radial-gradient(ellipse 22% 15% at 66% 32%, #6c8b4a 55%, transparent 62%), radial-gradient(ellipse 9% 16% at 86% 70%, #4a7f4f 55%, transparent 62%), linear-gradient(#1c4f8f, #163f78); }
+  .g-night { --atm: rgba(255, 181, 71, .22); }
+  .g-night .surface { background-image: radial-gradient(circle at 20% 38%, rgba(255, 200, 110, .95) 0 1.4px, transparent 2.4px), radial-gradient(circle at 55% 30%, rgba(255, 190, 90, .9) 0 1.2px, transparent 2.2px), radial-gradient(circle at 70% 62%, rgba(255, 210, 130, .9) 0 1.6px, transparent 2.6px), radial-gradient(circle at 35% 70%, rgba(255, 180, 80, .8) 0 1.1px, transparent 2px), radial-gradient(ellipse 18% 22% at 25% 40%, rgba(255, 170, 70, .16) 60%, transparent 63%), radial-gradient(ellipse 20% 18% at 64% 50%, rgba(255, 170, 70, .14) 60%, transparent 63%), linear-gradient(#070b18, #0a1122); background-size: 50% 100%, 50% 100%, 50% 100%, 50% 100%, 50% 100%, 50% 100%, 50% 100%; }
+  .g-moon { --atm: rgba(210, 215, 230, .18); }
+  .g-moon .surface { background-image: radial-gradient(circle at 20% 30%, #5d5f66 0 9%, transparent 10%), radial-gradient(circle at 48% 60%, #66686f 0 13%, transparent 14%), radial-gradient(circle at 75% 25%, #56585f 0 7%, transparent 8%), radial-gradient(circle at 82% 72%, #606269 0 10%, transparent 11%), radial-gradient(circle at 34% 82%, #5a5c63 0 6%, transparent 7%), linear-gradient(#9a9ca3, #8a8c93); }
+  .g-system { --atm: rgba(94, 242, 228, .3); }
+  .g-system .surface { background-image: repeating-linear-gradient(90deg, rgba(94, 242, 228, .35) 0 2px, transparent 2px 22px), repeating-linear-gradient(0deg, rgba(255, 181, 71, .25) 0 2px, transparent 2px 26px), radial-gradient(ellipse 30% 40% at 30% 50%, rgba(255, 94, 126, .45), transparent 70%), linear-gradient(#0d2c46, #0b3a3a); }
+  @media (max-width: 639px) { .feed-desc { display: none; } }
+
+  /* ============ Spec ============ */
+  .spec-grid { display: grid; gap: 16px; margin-top: 52px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 700px) { .spec-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1100px) { .spec-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .float-wrap { height: 100%; animation: floaty 7.5s ease-in-out infinite; animation-delay: var(--d, 0s); }
+  #spec:not([data-inview="true"]) .float-wrap { animation-play-state: paused; }
+  @keyframes floaty { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(0, -8px, 0); } }
+  .glow-card { --mx: -999px; --my: -999px; position: relative; height: 100%; border-radius: var(--r-lg); padding: 26px 26px 22px; background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .012)), rgba(9, 12, 22, .72); border: 1px solid var(--line); transition: transform .7s var(--ease), border-color .4s; transform-style: preserve-3d; }
+  .glow-card::before { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none; background: radial-gradient(300px circle at var(--mx) var(--my), rgba(94, 242, 228, .95), rgba(255, 181, 71, .55) 38%, transparent 70%); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); opacity: 0; transition: opacity .45s; }
+  .glow-card::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(460px circle at var(--mx) var(--my), rgba(94, 242, 228, .09), transparent 45%); opacity: 0; transition: opacity .45s; }
+  .spec-grid:hover .glow-card::before, .glow-card:hover::after, .glow-card:focus-within::before { opacity: 1; }
+  .spec-icon { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; color: var(--oiii); background: rgba(94, 242, 228, .07); border: 1px solid rgba(94, 242, 228, .22); box-shadow: 0 0 26px -8px rgba(94, 242, 228, .6); transform: translateZ(30px); }
+  .spec-icon svg { width: 22px; height: 22px; }
+  .spec-label { margin-top: 22px; font: 500 11px/1 var(--f-mono); letter-spacing: .16em; text-transform: uppercase; color: #8FA0BA; }
+  .spec-value { margin-top: 10px; font-family: var(--f-serif); font-size: clamp(2.9rem, 4.2vw, 3.7rem); line-height: 1; letter-spacing: -.02em; transform: translateZ(22px); }
+  .spec-value small { margin-left: 8px; font: 500 14px/1 var(--f-mono); letter-spacing: .04em; color: var(--ha); }
+  .spec-value sup { font-size: .5em; }
+  .spec-desc { margin-top: 14px; color: #A9B4C8; font-size: 15px; line-height: 1.62; }
+  .spec-foot { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); font: 500 10.5px/1.3 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+
+  .matrix-card { margin-top: 20px; border-radius: var(--r-xl); padding: 26px 8px 10px; }
+  .matrix-head { padding: 0 18px 12px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 24px; align-items: baseline; }
+  .matrix-scroll { overflow-x: auto; }
+  .matrix { width: 100%; min-width: 760px; border-collapse: separate; border-spacing: 0; font-size: 14.5px; }
+  .matrix th, .matrix td { text-align: left; padding: 16px 18px; border-bottom: 1px solid var(--line); vertical-align: baseline; }
+  .matrix thead th { font: 500 10.5px/1 var(--f-mono); letter-spacing: .15em; text-transform: uppercase; color: var(--dim); }
+  .matrix td { color: #C0CADB; font-variant-numeric: tabular-nums; }
+  .matrix tbody th { font-weight: 500; color: var(--ink); white-space: nowrap; }
+  .matrix tbody tr { transition: background .3s; }
+  .matrix tbody tr:hover { background: rgba(255, 255, 255, .025); }
+  .matrix tr.us th, .matrix tr.us td { color: #fff; border-bottom-color: transparent; background: linear-gradient(90deg, rgba(94, 242, 228, .12), rgba(255, 181, 71, .07)); }
+  .matrix tr.us th { border-radius: 14px 0 0 14px; }
+  .matrix tr.us td:last-child { border-radius: 0 14px 14px 0; }
+  .matrix tr.us .hl { color: var(--oiii); text-shadow: 0 0 18px rgba(94, 242, 228, .55); }
+
+  .profile { position: relative; display: grid; gap: 14px; margin-top: 26px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 700px) { .profile { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1100px) { .profile { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .step { position: relative; padding: 22px 22px 20px; border-radius: var(--r-lg); border: 1px solid var(--line); background: rgba(255, 255, 255, .022); transition: border-color .4s, background .4s, transform .6s var(--ease); }
+  .step:hover { border-color: rgba(255, 181, 71, .4); background: rgba(255, 181, 71, .04); transform: translateY(-4px); }
+  .step-n { display: flex; align-items: center; gap: 10px; font: 500 11px/1 var(--f-mono); letter-spacing: .14em; color: var(--ha); }
+  .step-n::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255, 181, 71, .5), transparent); }
+  .step-v { margin-top: 18px; font-family: var(--f-serif); font-size: 2.5rem; line-height: 1; }
+  .step h4 { margin-top: 6px; font-size: 15px; font-weight: 600; }
+  .step p { margin-top: 8px; font-size: 14px; line-height: 1.6; color: #A2ADC2; }
+
+  /* ============ Footer ============ */
+  .footer { position: relative; overflow: hidden; padding-top: clamp(80px, 10vw, 130px); border-top: 1px solid var(--line); }
+  .footer::before { content: ""; position: absolute; left: 50%; top: -1px; width: min(70%, 700px); height: 1px; transform: translateX(-50%); background: linear-gradient(90deg, transparent, var(--oiii), var(--ha), transparent); box-shadow: 0 0 22px rgba(94, 242, 228, .6); }
+  .footer-link { color: #A9B4C8; transition: color .3s; }
+  .footer-link:hover { color: #fff; }
+  .wordmark { display: block; margin-top: 64px; font-family: var(--f-serif); font-size: clamp(4rem, 17.5vw, 19.5rem); line-height: .78; letter-spacing: -.045em; text-align: center; white-space: nowrap; color: transparent; -webkit-text-stroke: 1px rgba(170, 195, 255, .2); background: linear-gradient(180deg, rgba(94, 242, 228, .22), rgba(94, 242, 228, 0) 72%); -webkit-background-clip: text; background-clip: text; user-select: none; }
+  .wordmark em { font-style: italic; }
+
+  /* ============ Theater dialog ============ */
+  .theater { padding: 0; border: 0; background: transparent; color: var(--ink); width: min(1100px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px); overflow-x: hidden; overflow-y: auto; margin: auto; }
+  .theater::backdrop { background: rgba(2, 3, 8, .8); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .theater[open] .theater-inner { animation: pop .7s var(--ease) both; }
+  @keyframes pop { from { opacity: 0; transform: scale(.96); } }
+  .theater-inner { border-radius: var(--r-xl); overflow: hidden; background: rgba(8, 10, 19, .9); border: 1px solid var(--line-2); box-shadow: 0 60px 140px -40px rgba(94, 242, 228, .35); }
+  .theater-media { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 64dvh; background: #000; }
+  .theater-media video { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: contain; }
+  .theater-offline { position: absolute; inset: 0; display: grid; place-content: center; gap: 12px; text-align: center; padding: 24px; color: #A9B4C8; background: radial-gradient(ellipse at center, rgba(255, 94, 126, .08), transparent 60%); }
+  .theater-bar { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-top: 1px solid var(--line); }
+  .theater-bar .range { flex: 1; min-width: 60px; }
+  .theater-time { font: 500 12px/1 var(--f-mono); color: #A9B4C8; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .theater-meta { display: grid; gap: 8px; padding: 6px 22px 24px; }
+  .theater[data-playing="true"] .th-ico-play, .theater:not([data-playing="true"]) .th-ico-pause { display: none; }
+  @media (max-width: 560px) { .theater-time { display: none; } .theater-bar .src-link { display: none; } }
+
+  /* ============ Custom cursor ============ */
+  .cursor { position: fixed; left: 0; top: 0; z-index: 200; pointer-events: none; opacity: 0; transition: opacity .35s ease; }
+  html[data-cursorfx="on"][data-cursor-shown="true"] .cursor { opacity: 1; }
+  html[data-cursorfx="on"]:not([data-theater="open"]), html[data-cursorfx="on"]:not([data-theater="open"]) * { cursor: none !important; }
+  html[data-theater="open"] .cursor { opacity: 0 !important; }
+  .cursor-dot i { position: absolute; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #fff; box-shadow: 0 0 10px 2px rgba(94, 242, 228, .9), 0 0 26px 6px rgba(94, 242, 228, .35); }
+  .cursor-ring-inner { position: absolute; width: 38px; height: 38px; margin: -19px 0 0 -19px; display: grid; place-items: center; border-radius: 50%; border: 1px solid rgba(94, 242, 228, .55); box-shadow: 0 0 18px rgba(94, 242, 228, .25), inset 0 0 12px rgba(94, 242, 228, .14); transition: transform .5s var(--ease), width .5s var(--ease), height .5s var(--ease), margin .5s var(--ease), background .35s, border-color .35s; }
+  .cursor-ring[data-state="hover"] .cursor-ring-inner { transform: scale(1.55); border-color: rgba(255, 181, 71, .75); background: rgba(255, 181, 71, .06); }
+  .cursor-ring[data-state="label"] .cursor-ring-inner { width: 78px; height: 78px; margin: -39px 0 0 -39px; background: rgba(94, 242, 228, .13); border-color: rgba(94, 242, 228, .85); }
+  .cursor-ring[data-press="true"] .cursor-ring-inner { transform: scale(.78); }
+  #cursor-label { font: 500 10px/1 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: #E2FFFB; opacity: 0; transition: opacity .3s; }
+  .cursor-ring[data-state="label"] #cursor-label { opacity: 1; }
+  .cursor-aura::before { content: ""; position: absolute; width: 600px; height: 600px; margin: -300px 0 0 -300px; border-radius: 50%; background: radial-gradient(circle, rgba(94, 242, 228, .085), rgba(255, 181, 71, .035) 34%, transparent 64%); }
+
+  /* ============ Reduced motion ============ */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+    .hero-video { transform: none; }
+  }
+</style>
+
+<script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  } }
+</script>
+</head>
+
+<body>
+<a class="skip" href="#lab">Skip to the lens lab</a>
+
+<div class="atmos" aria-hidden="true"><div class="blob blob-a"></div><div class="blob blob-b"></div><div class="blob blob-c"></div></div>
+
+<!-- ======================= NAV ======================= -->
+<header id="nav" class="nav" data-scrolled="false">
+  <div class="wrap">
+    <nav class="nav-bar" aria-label="Primary">
+      <a href="#top" class="brand" aria-label="LUMEN/550, back to top" data-magnetic="0.2">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <defs><linearGradient id="lg-brand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5EF2E4"/><stop offset="1" stop-color="#FFB547"/></linearGradient></defs>
+          <circle cx="16" cy="16" r="11" fill="none" stroke="url(#lg-brand)" stroke-width="2"/>
+          <circle cx="16" cy="16" r="4.2" fill="#FFB547"/>
+          <circle cx="27" cy="16" r="1.9" fill="#5EF2E4"/>
+        </svg>
+        <span>LUMEN<small>/550</small></span>
+      </a>
+
+      <div class="hidden lg:flex items-center gap-1 ml-6">
+        <a class="nav-link" href="#lab" data-nav="lab">Lens lab</a>
+        <a class="nav-link" href="#feeds" data-nav="feeds">Feeds</a>
+        <a class="nav-link" href="#spec" data-nav="spec">Spec</a>
+        <a class="nav-link" href="#profile" data-nav="profile">Flight profile</a>
+      </div>
+
+      <div class="ml-auto flex items-center gap-2">
+        <span class="status status-nav" title="Concept launch window: 16 July 2035, 14:00 UTC">
+          <span class="pulse" aria-hidden="true"></span>
+          <span>Phase A</span>
+          <span class="sr-only">Concept launch window opens 16 July 2035.</span>
+          <span aria-hidden="true" class="text-[#7fe9df]" data-clock>T−0d 00:00:00</span>
+        </span>
+        <a href="#lab" class="btn btn-glow btn-sm nav-cta" data-magnetic="0.25">
+          Launch lab
+          <svg class="arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </a>
+        <button id="menu-btn" class="menu-btn" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu"><span></span><span></span></button>
+      </div>
+      <div id="progress" class="progress" aria-hidden="true"></div>
+    </nav>
+
+    <div id="mobile-menu" class="sheet glass" hidden>
+      <a href="#lab">Lens lab <span>Live 3D</span></a>
+      <a href="#feeds">Feeds <span>NASA SVS</span></a>
+      <a href="#spec">Spec <span>Concept targets</span></a>
+      <a href="#profile">Flight profile <span>2035 →</span></a>
+      <div class="flex items-center justify-between gap-3 px-4 py-3">
+        <span class="status"><span class="pulse" aria-hidden="true"></span><span aria-hidden="true" data-clock>T−0d 00:00:00</span></span>
+        <a href="#lab" class="btn btn-glow btn-sm">Launch lab</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<!-- ======================= HERO ======================= -->
+<section id="top" class="hero" data-section="top" data-video="pending" aria-labelledby="hero-title">
+  <div class="hero-media" aria-hidden="true">
+    <div class="hero-fallback"></div>
+    <video id="hero-video" class="hero-video" muted loop playsinline preload="auto" disablepictureinpicture disableremoteplayback
+           data-src="https://svs.gsfc.nasa.gov/vis/a010000/a013300/a013326/BH_Accretion_Disk_Sim_360_1080.mp4"></video>
+  </div>
+  <div class="hero-shade" aria-hidden="true"></div>
+  <canvas id="hero-canvas" aria-hidden="true"></canvas>
+
+  <div class="hero-content wrap">
+    <div class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_330px] items-end">
+      <div>
+        <p class="eyebrow eyebrow-wrap" data-hero-fade><span class="orbit-ico" aria-hidden="true"></span><span>Concept mission</span><span class="tick" aria-hidden="true"></span><span>Solar gravitational lens</span></p>
+        <h1 id="hero-title" class="display h-hero">
+          <span class="line-mask"><span class="word">Use</span> <span class="word">the</span> <span class="word">Sun</span></span>
+          <span class="line-mask"><span class="word">as</span> <span class="word">a</span> <span class="word liquid">lens.</span></span>
+        </h1>
+        <p class="hero-sub" data-hero-fade>About 550&nbsp;AU out, the Sun’s gravity bends starlight into a focal line. LUMEN/550 is a fleet of sail-driven probes built to reach it, then photograph a planet around another star: continents, coastlines, clouds.</p>
+        <div class="mt-9 flex flex-wrap gap-3" data-hero-fade>
+          <a href="#lab" class="btn btn-glow" data-magnetic="0.3">
+            Open the lens lab
+            <svg class="arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+          </a>
+          <a href="#feeds" class="btn btn-ghost" data-magnetic="0.3">
+            <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z"/></svg>
+            Watch the feeds
+          </a>
+        </div>
+      </div>
+
+      <aside class="hero-card glass hidden lg:block" aria-label="Lens readout">
+        <div class="flex items-center justify-between">
+          <p class="mono-label">Lens readout</p>
+          <span class="pulse" aria-hidden="true"></span>
+        </div>
+        <dl>
+          <div><dt>Light gain at 1&nbsp;µm</dt><dd>≈10<sup>11</sup></dd></div>
+          <div><dt>Einstein ring radius</dt><dd>1.74″</dd></div>
+          <div><dt>Focal line</dt><dd>548&nbsp;AU&nbsp;→&nbsp;∞</dd></div>
+        </dl>
+        <svg viewBox="0 0 290 74" role="img" aria-label="Schematic, not to scale: light rays pass the Sun, bend and converge on a focal line where a probe waits.">
+          <defs><linearGradient id="ray" x1="0" x2="1"><stop offset="0" stop-color="#5EF2E4" stop-opacity=".2"/><stop offset=".5" stop-color="#5EF2E4"/><stop offset="1" stop-color="#FFB547"/></linearGradient></defs>
+          <line x1="0" y1="37" x2="290" y2="37" stroke="rgba(170,195,255,.25)" stroke-dasharray="2 4"/>
+          <path d="M0 19H58L238 37L290 42.2" fill="none" stroke="url(#ray)" stroke-width="1.3"/>
+          <path d="M0 55H58L238 37L290 31.8" fill="none" stroke="url(#ray)" stroke-width="1.3"/>
+          <circle cx="58" cy="37" r="15" fill="#FFB547"/>
+          <circle cx="58" cy="37" r="21" fill="none" stroke="#FFB547" stroke-opacity=".25"/>
+          <circle cx="252" cy="37" r="3.2" fill="#5EF2E4"/>
+          <text x="252" y="62" fill="#8FA0BA" font-family="Geist Mono, ui-monospace, monospace" font-size="9" text-anchor="middle">550 AU</text>
+          <text x="58" y="68" fill="#8FA0BA" font-family="Geist Mono, ui-monospace, monospace" font-size="9" text-anchor="middle">SUN</text>
+        </svg>
+      </aside>
+    </div>
+
+    <dl class="mt-10 grid grid-cols-2 gap-2.5 md:grid-cols-4" data-hero-fade>
+      <div class="chip"><dt>Focal line begins</dt><dd>548 AU</dd></div>
+      <div class="chip"><dt>One-way light</dt><dd>3.18 days</dd></div>
+      <div class="chip"><dt>Cruise speed</dt><dd>≈25 AU / yr</dd></div>
+      <div class="chip"><dt>Target</dt><dd>Exo-Earth · 30&nbsp;pc</dd></div>
+    </dl>
+  </div>
+
+  <div class="hero-foot">
+    <div class="wrap hero-foot-inner">
+      <span class="scroll-cue"><i aria-hidden="true"></i>Scroll</span>
+      <span id="hero-credit" class="hidden md:block text-center">Background · NASA/GSFC SVS 13326 · simulated black hole</span>
+      <button id="motion-btn" class="motion-btn" type="button" aria-pressed="false">
+        <svg class="ico-pause-s" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5h2.5v9H2.5zM7 1.5h2.5v9H7z"/></svg>
+        <svg class="ico-play-s" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M3 1.5v9l7-4.5z"/></svg>
+        <span id="motion-label">Pause motion</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <span>SGL focal line begins <b>548 AU</b><i></i>One-way light time <b>3.18 d</b><i></i>Einstein ring <b>1.74″</b><i></i>Lens gain <b>≈10¹¹ @ 1 µm</b><i></i>Target <b>exo-Earth · 30 pc</b><i></i>Cruise <b>≈25 AU/yr</b><i></i>Heliopause crossing <b>~year 5</b><i></i>Solar aperture <b>1.39 × 10⁶ km</b><i></i></span>
+    <span>SGL focal line begins <b>548 AU</b><i></i>One-way light time <b>3.18 d</b><i></i>Einstein ring <b>1.74″</b><i></i>Lens gain <b>≈10¹¹ @ 1 µm</b><i></i>Target <b>exo-Earth · 30 pc</b><i></i>Cruise <b>≈25 AU/yr</b><i></i>Heliopause crossing <b>~year 5</b><i></i>Solar aperture <b>1.39 × 10⁶ km</b><i></i></span>
+  </div>
+</div>
+
+<!-- ======================= LENS LAB (3D) ======================= -->
+<section id="lab" class="section" data-section="lab" aria-labelledby="lab-title" tabindex="-1">
+  <div class="wrap">
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow"><span class="tick" aria-hidden="true"></span>Lens lab · live WebGL</p>
+        <h2 id="lab-title" class="display h-section mt-5">Every lens starts <em>as a star.</em></h2>
+      </div>
+      <p class="lede">Drag to orbit and click the photosphere to fire a flare. Swap in real stars at their measured temperatures and watch color, granulation and corona respond. The rings are probe orbits; the halo is the Einstein ring they are chasing.</p>
+    </div>
+
+    <div class="lab-grid">
+      <div id="viewport" class="viewport" tabindex="0" role="group" aria-roledescription="3D viewport" aria-label="Interactive star. Drag or use arrow keys to orbit, plus and minus to zoom, F to fire a flare, R to reset the view." data-cursor="Drag">
+        <canvas id="lab-canvas"></canvas>
+        <div class="hud" aria-hidden="true">
+          <span class="corner c1"></span><span class="corner c2"></span><span class="corner c3"></span><span class="corner c4"></span>
+          <span class="crosshair"></span>
+          <div class="hud-tl">
+            <div><span class="acc">●</span> <strong>LUMEN/550 · lens lab</strong></div>
+            <div>Object <strong id="hud-obj">Sol</strong> · <span id="hud-class">G2V</span></div>
+            <div>T<sub>eff</sub> <strong id="hud-teff">5,772 K</strong></div>
+          </div>
+          <div class="hud-tr">
+            <div><strong id="hud-fps">--</strong> FPS</div>
+            <div><strong id="hud-tris">--</strong> tris · <strong id="hud-calls">--</strong> draws</div>
+            <div>DPR <strong id="hud-dpr">--</strong> · mode <strong id="hud-mode">surface</strong></div>
+          </div>
+          <div class="hud-bl">
+            <div>Camera <strong id="hud-dist">5.9</strong> R★</div>
+            <div>Einstein ring <strong>1.74″</strong> @ 550 AU</div>
+          </div>
+        </div>
+        <div class="hud-br">
+          <span id="hud-hint" class="hud-hint mono-label">Click to engage · scroll zooms</span>
+          <button id="zoom-in" class="icon-btn" type="button" aria-label="Zoom in" data-cursor="Zoom"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg></button>
+          <button id="zoom-out" class="icon-btn" type="button" aria-label="Zoom out" data-cursor="Zoom"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10"/></svg></button>
+        </div>
+        <div class="webgl-off"><div><p class="display text-3xl text-ink">WebGL is unavailable here.</p><p class="mt-2 text-sm">The lens lab needs WebGL. Try a current Chrome, Edge, Firefox or Safari with hardware acceleration on.</p></div></div>
+      </div>
+
+      <aside class="panel glass" aria-label="Render controls">
+        <div class="panel-head">
+          <p class="mono-label">Render controls</p>
+          <span class="live-pill"><span class="pulse" aria-hidden="true"></span>Live</span>
+        </div>
+
+        <fieldset class="ctl">
+          <legend class="ctl-label mb-2.5">Render mode</legend>
+          <div class="seg">
+            <input type="radio" name="mode" id="mode-solid" value="solid" checked><label for="mode-solid">Surface</label>
+            <input type="radio" name="mode" id="mode-wire" value="wire"><label for="mode-wire">Wireframe</label>
+            <input type="radio" name="mode" id="mode-points" value="points"><label for="mode-points">Points</label>
+          </div>
+        </fieldset>
+
+        <div class="ctl">
+          <div class="ctl-row"><label class="ctl-label" for="ctl-speed">Rotation speed</label><output id="out-speed" for="ctl-speed">1.00×</output></div>
+          <input type="range" id="ctl-speed" class="range" min="0" max="3" step="0.05" value="1">
+        </div>
+
+        <div class="ctl">
+          <div class="ctl-row"><label class="ctl-label" for="ctl-temp">Surface temperature</label><output id="out-temp" for="ctl-temp">5,772 K · G</output></div>
+          <input type="range" id="ctl-temp" class="range range-temp" min="0" max="1000" step="1" value="302" aria-describedby="class-scale-desc">
+          <div class="class-scale" aria-hidden="true"><span style="left:6.6%">M</span><span style="left:20.4%">K</span><span style="left:29.1%">G</span><span style="left:35.8%">F</span><span style="left:45%">A</span><span style="left:69.1%">B</span><span style="left:95.2%">O</span></div>
+          <p id="class-scale-desc" class="sr-only">Logarithmic scale from 2,500 to 40,000 kelvin, spanning spectral classes M through O.</p>
+        </div>
+
+        <div class="ctl">
+          <div class="ctl-row"><label class="ctl-label" for="ctl-turb">Surface turbulence</label><output id="out-turb" for="ctl-turb">35%</output></div>
+          <input type="range" id="ctl-turb" class="range" min="0" max="1" step="0.01" value="0.35">
+        </div>
+
+        <div class="ctl">
+          <div class="ctl-row"><label class="ctl-label" for="ctl-hue">Accent color shift</label><output id="out-hue" for="ctl-hue">174°</output></div>
+          <input type="range" id="ctl-hue" class="range range-hue" min="0" max="360" step="1" value="174">
+        </div>
+
+        <div class="switches">
+          <label class="switch"><input type="checkbox" id="tg-rings" checked><span class="switch-ui" aria-hidden="true"></span>Probe orbits</label>
+          <label class="switch"><input type="checkbox" id="tg-probes" checked><span class="switch-ui" aria-hidden="true"></span>Probe swarm</label>
+          <label class="switch"><input type="checkbox" id="tg-einstein" checked><span class="switch-ui" aria-hidden="true"></span>Einstein ring</label>
+          <label class="switch"><input type="checkbox" id="tg-corona" checked><span class="switch-ui" aria-hidden="true"></span>Corona</label>
+        </div>
+
+        <div class="ctl">
+          <p class="ctl-label">Real-star presets</p>
+          <div class="presets" id="presets">
+            <button class="preset" type="button" data-preset="sol" aria-pressed="true"><i></i>Sol <small>G2V</small></button>
+            <button class="preset" type="button" data-preset="proxima" aria-pressed="false"><i></i>Proxima Cen <small>M5.5V</small></button>
+            <button class="preset" type="button" data-preset="betelgeuse" aria-pressed="false"><i></i>Betelgeuse <small>M1 Ia</small></button>
+            <button class="preset" type="button" data-preset="sirius" aria-pressed="false"><i></i>Sirius A <small>A1V</small></button>
+            <button class="preset" type="button" data-preset="rigel" aria-pressed="false"><i></i>Rigel <small>B8 Ia</small></button>
+            <button class="preset" type="button" data-preset="zeta" aria-pressed="false"><i></i>ζ Puppis <small>O4 If</small></button>
+          </div>
+        </div>
+
+        <div class="panel-actions">
+          <button id="btn-flare" class="btn btn-glow btn-sm" type="button" data-magnetic="0.2">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3M3.4 3.4l2.1 2.1M10.5 10.5l2.1 2.1M3.4 12.6l2.1-2.1M10.5 5.5l2.1-2.1"/></svg>
+            Fire flare
+          </button>
+          <button id="btn-reset" class="btn btn-ghost btn-sm" type="button" data-magnetic="0.2">Reset view</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= FEEDS (VIDEO) ======================= -->
+<section id="feeds" class="section section-tight" data-section="feeds" aria-labelledby="feeds-title" tabindex="-1">
+  <div class="wrap">
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow"><span class="tick" aria-hidden="true"></span>Deep field feeds · NASA SVS</p>
+        <h2 id="feeds-title" class="display h-section mt-5">Footage from <em>the neighborhood.</em></h2>
+      </div>
+      <p class="lede">Scientific visualizations from NASA’s Goddard Space Flight Center. Hover to preview, press play to keep a feed running, open any card for the full-size theater.</p>
+    </div>
+
+    <div class="feeds-grid" data-stagger>
+      <article class="feed feed-xl" data-feed data-state="idle" data-playing="false" data-pinned="false"
+               data-title="Accretion, 360°" data-kicker="Feed 01 · Black hole simulation" data-page="https://svs.gsfc.nasa.gov/13326/"
+               data-desc="A full revolution around a simulated black hole. Gravity drags light from the far side of the disk up and over the shadow: lensing at its most extreme, the same effect LUMEN/550 borrows from the Sun.">
+        <div class="sim" aria-hidden="true">
+          <div class="sim-stage"><i class="disk anim"></i><i class="bh-halo"></i><i class="bh-core"></i></div>
+          
+        </div>
+        <video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback data-src="https://svs.gsfc.nasa.gov/vis/a010000/a013300/a013326/BH_Accretion_Disk_Sim_360_1080.mp4"></video>
+        <div class="feed-shade" aria-hidden="true"></div>
+        <button class="feed-open" type="button" aria-label="Open Accretion, 360° in the theater" data-cursor="Open"></button>
+        <div class="feed-top"><div class="badges"><span class="badge badge-sim"><i></i><span data-status>Sim · 1080²</span></span><span class="badge">SVS 13326</span></div><span class="badge" data-dur>—:—</span></div>
+        <button class="play" type="button" aria-label="Play Accretion, 360°" data-cursor="Play">
+          <svg class="play-ring" viewBox="0 0 72 72" aria-hidden="true"><circle class="track" cx="36" cy="36" r="34"/><circle class="prog" cx="36" cy="36" r="34"/></svg>
+          <svg class="ico ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+          <svg class="ico ico-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+        </button>
+        <div class="feed-meta"><p class="feed-kicker">Feed 01 · Goddard, Pleiades supercomputer</p><h3 class="display feed-title">Accretion, 360°</h3><p class="feed-desc">A full revolution around a simulated black hole. Gravity drags light from the far side of the disk up and over the shadow: lensing at its most extreme.</p></div>
+      </article>
+
+      <article class="feed" data-feed data-state="idle" data-playing="false" data-pinned="false"
+               data-title="Home signal" data-kicker="Feed 02 · Earth, 1 AU" data-page="https://svs.gsfc.nasa.gov/5570/"
+               data-desc="Earth with clouds, atmosphere and night lights. At 30 parsecs, a planet like this would be a single unresolved point to every telescope ever built. A solar lens changes that.">
+        <div class="sim" aria-hidden="true"><div class="globe g-earth"><i class="surface anim"></i><i class="shade"></i></div></div>
+        <video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback data-src="https://svs.gsfc.nasa.gov/vis/a000000/a005500/a005570/Earth_wAtmos_spin_02_1080p60.mp4"></video>
+        <div class="feed-shade" aria-hidden="true"></div>
+        <button class="feed-open" type="button" aria-label="Open Home signal in the theater" data-cursor="Open"></button>
+        <div class="feed-top"><div class="badges"><span class="badge badge-sim"><i></i><span data-status>1080p60</span></span></div><span class="badge" data-dur>—:—</span></div>
+        <button class="play" type="button" aria-label="Play Home signal" data-cursor="Play">
+          <svg class="play-ring" viewBox="0 0 72 72" aria-hidden="true"><circle class="track" cx="36" cy="36" r="34"/><circle class="prog" cx="36" cy="36" r="34"/></svg>
+          <svg class="ico ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+          <svg class="ico ico-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+        </button>
+        <div class="feed-meta"><p class="feed-kicker">Feed 02 · SVS 5570</p><h3 class="display feed-title">Home signal</h3><p class="feed-desc">Clouds, atmosphere and city lights: the benchmark for what a lens could resolve elsewhere.</p></div>
+      </article>
+
+      <article class="feed" data-feed data-state="idle" data-playing="false" data-pinned="false"
+               data-title="Night side" data-kicker="Feed 03 · Suomi NPP / VIIRS" data-page="https://svs.gsfc.nasa.gov/30082/"
+               data-desc="The VIIRS day/night band maps electric light across Earth’s dark hemisphere. Artificial illumination is one of the technosignatures a resolved exoplanet image could reveal.">
+        <div class="sim" aria-hidden="true"><div class="globe g-night"><i class="surface anim"></i><i class="shade"></i></div></div>
+        <video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback data-src="https://svs.gsfc.nasa.gov/vis/a030000/a030000/a030082/viirs_dnb_night_lights_rotating_earth_1080p.mp4"></video>
+        <div class="feed-shade" aria-hidden="true"></div>
+        <button class="feed-open" type="button" aria-label="Open Night side in the theater" data-cursor="Open"></button>
+        <div class="feed-top"><div class="badges"><span class="badge badge-sim"><i></i><span data-status>VIIRS · 1080p</span></span></div><span class="badge" data-dur>—:—</span></div>
+        <button class="play" type="button" aria-label="Play Night side" data-cursor="Play">
+          <svg class="play-ring" viewBox="0 0 72 72" aria-hidden="true"><circle class="track" cx="36" cy="36" r="34"/><circle class="prog" cx="36" cy="36" r="34"/></svg>
+          <svg class="ico ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+          <svg class="ico ico-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+        </button>
+        <div class="feed-meta"><p class="feed-kicker">Feed 03 · SVS 30082</p><h3 class="display feed-title">Night side</h3><p class="feed-desc">City light seen from orbit: a technosignature, at home.</p></div>
+      </article>
+
+      <article class="feed" data-feed data-state="idle" data-playing="false" data-pinned="false"
+               data-title="Lunar turntable" data-kicker="Feed 04 · Lunar Reconnaissance Orbiter" data-page="https://svs.gsfc.nasa.gov/5319/"
+               data-desc="LRO color and topography wrapped onto a 360° turntable. A resolved, well-mapped body like this is exactly what image reconstruction pipelines are tested against.">
+        <div class="sim" aria-hidden="true"><div class="globe g-moon"><i class="surface anim"></i><i class="shade"></i></div></div>
+        <video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback data-src="https://svs.gsfc.nasa.gov/vis/a000000/a005300/a005319/moon_turntable_1080p30.mp4"></video>
+        <div class="feed-shade" aria-hidden="true"></div>
+        <button class="feed-open" type="button" aria-label="Open Lunar turntable in the theater" data-cursor="Open"></button>
+        <div class="feed-top"><div class="badges"><span class="badge badge-sim"><i></i><span data-status>LRO · 1080p30</span></span></div><span class="badge" data-dur>—:—</span></div>
+        <button class="play" type="button" aria-label="Play Lunar turntable" data-cursor="Play">
+          <svg class="play-ring" viewBox="0 0 72 72" aria-hidden="true"><circle class="track" cx="36" cy="36" r="34"/><circle class="prog" cx="36" cy="36" r="34"/></svg>
+          <svg class="ico ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+          <svg class="ico ico-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+        </button>
+        <div class="feed-meta"><p class="feed-kicker">Feed 04 · SVS 5319</p><h3 class="display feed-title">Lunar turntable</h3><p class="feed-desc">A calibration target every optics team knows by heart.</p></div>
+      </article>
+
+      <article class="feed" data-feed data-state="idle" data-playing="false" data-pinned="false"
+               data-title="Earth, as a system" data-kicker="Feed 05 · Earth system science" data-page="https://svs.gsfc.nasa.gov/30701/"
+               data-desc="Observational and model data layered sphere by sphere: atmosphere, ocean, ice, land and life. Spectroscopy through the solar lens would read the same layers on another world.">
+        <div class="sim" aria-hidden="true"><div class="globe g-system"><i class="surface anim"></i><i class="shade"></i></div></div>
+        <video muted loop playsinline preload="none" disablepictureinpicture disableremoteplayback data-src="https://svs.gsfc.nasa.gov/vis/a030000/a030700/a030701/beach_ball_noLabels_1080p.mp4"></video>
+        <div class="feed-shade" aria-hidden="true"></div>
+        <button class="feed-open" type="button" aria-label="Open Earth, as a system in the theater" data-cursor="Open"></button>
+        <div class="feed-top"><div class="badges"><span class="badge badge-sim"><i></i><span data-status>Data · 1080p</span></span></div><span class="badge" data-dur>—:—</span></div>
+        <button class="play" type="button" aria-label="Play Earth, as a system" data-cursor="Play">
+          <svg class="play-ring" viewBox="0 0 72 72" aria-hidden="true"><circle class="track" cx="36" cy="36" r="34"/><circle class="prog" cx="36" cy="36" r="34"/></svg>
+          <svg class="ico ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+          <svg class="ico ico-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+        </button>
+        <div class="feed-meta"><p class="feed-kicker">Feed 05 · SVS 30701</p><h3 class="display feed-title">Earth, as a system</h3><p class="feed-desc">Air, water, ice, land and life, layer by layer.</p></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= SPEC MATRIX ======================= -->
+<section id="spec" class="section section-tight" data-section="spec" aria-labelledby="spec-title" tabindex="-1">
+  <div class="wrap">
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow"><span class="tick" aria-hidden="true"></span>Flight spec · concept targets</p>
+        <h2 id="spec-title" class="display h-section mt-5">The aperture is the Sun. <em>The hard part is the trip.</em></h2>
+      </div>
+      <p class="lede">A lens 1.39 million kilometers wide costs nothing to build. Putting a telescope at its focus takes a sail, two decades and a lot of patience. The figures are design targets for this concept, grounded in published solar-lens mission studies.</p>
+    </div>
+
+    <div id="spec-grid" class="spec-grid" data-stagger>
+      <div><div class="float-wrap" style="--d:0s"><article class="glow-card" data-tilt>
+        <div class="spec-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 20L20 4M20 4c-6 1-11 4-13 9l4 0 0 4c5-2 8-7 9-13z"/></svg></div>
+        <p class="spec-label">Propulsion</p>
+        <p class="spec-value">≈25<small>AU / yr</small></p>
+        <p class="spec-desc">A solar sail dives to 0.1&nbsp;AU, then rides sunlight outward faster than anything yet flown. Voyager&nbsp;1 manages about 3.6.</p>
+        <p class="spec-foot">Sail · perihelion 0.1 AU</p>
+      </article></div></div>
+
+      <div><div class="float-wrap" style="--d:-1.2s"><article class="glow-card" data-tilt>
+        <div class="spec-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3.5"/><circle cx="12" cy="12" r="8.5" stroke-dasharray="2 3"/></svg></div>
+        <p class="spec-label">Light gain</p>
+        <p class="spec-value">≈10<sup>11</sup><small>@ 1 µm</small></p>
+        <p class="spec-desc">At one micron the Sun amplifies a distant planet’s light roughly a hundred billion times. Physics does the heavy lifting; the telescope can stay small.</p>
+        <p class="spec-foot">Gravitational focusing</p>
+      </article></div></div>
+
+      <div><div class="float-wrap" style="--d:-2.4s"><article class="glow-card" data-tilt>
+        <div class="spec-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 10l5-3v10l-5-3"/></svg></div>
+        <p class="spec-label">Optics</p>
+        <p class="spec-value">1.0<small>m aperture</small></p>
+        <p class="spec-desc">A modest telescope behind an internal coronagraph blocks the solar disk and keeps only the thin Einstein ring glowing around it.</p>
+        <p class="spec-foot">Telescope · coronagraph</p>
+      </article></div></div>
+
+      <div><div class="float-wrap" style="--d:-3.6s"><article class="glow-card" data-tilt>
+        <div class="spec-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="12" r="1.6"/><circle cx="9.5" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="20.5" cy="12" r="1.6"/></svg></div>
+        <p class="spec-label">Fleet</p>
+        <p class="spec-value">20<small>craft</small></p>
+        <p class="spec-desc">Launched as a string of pearls, one a year. Each samples a different slice of the ring; together they rebuild a single image.</p>
+        <p class="spec-foot">String-of-pearls cadence</p>
+      </article></div></div>
+
+      <div><div class="float-wrap" style="--d:-4.8s"><article class="glow-card" data-tilt>
+        <div class="spec-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></div>
+        <p class="spec-label">Link</p>
+        <p class="spec-value">3.18<small>days one-way</small></p>
+        <p class="spec-desc">Light time at 550&nbsp;AU. Every command is three days stale when it lands, so each craft navigates, points and recovers by itself.</p>
+        <p class="spec-foot">Optical downlink</p>
+      </article></div></div>
+
+      <div><div class="float-wrap" style="--d:-6s"><article class="glow-card" data-tilt>
+        <div class="spec-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16"/></svg></div>
+        <p class="spec-label">Resolution</p>
+        <p class="spec-value">≈13<small>km / pixel</small></p>
+        <p class="spec-desc">An Earth-size planet at 30 parsecs, reconstructed at about 1,000 × 1,000 pixels after roughly a year of integration.</p>
+        <p class="spec-foot">Exo-Earth @ 30 pc</p>
+      </article></div></div>
+    </div>
+
+    <div class="matrix-card glass" data-reveal>
+      <div class="matrix-head">
+        <h3 class="display text-3xl md:text-4xl">Aperture vs. resolving power</h3>
+        <p class="mono-label">Diffraction limit 1.22 λ/D</p>
+      </div>
+      <div class="matrix-scroll" tabindex="0" role="region" aria-label="Comparison table, scrolls horizontally on small screens">
+        <table class="matrix">
+          <thead><tr><th scope="col">Instrument</th><th scope="col">Aperture</th><th scope="col">Resolution</th><th scope="col">Location</th><th scope="col">Exo-Earth at 30 pc</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Hubble</th><td>2.4 m</td><td>0.05″ at 500 nm</td><td>Low Earth orbit</td><td>Unresolved point</td></tr>
+            <tr><th scope="row">JWST</th><td>6.5 m</td><td>0.08″ at 2 µm</td><td>Sun–Earth L2</td><td>Unresolved point</td></tr>
+            <tr><th scope="row">ELT</th><td>39 m</td><td>0.006″ at 1 µm</td><td>Cerro Armazones, Chile</td><td>Unresolved point</td></tr>
+            <tr class="us"><th scope="row">LUMEN/550</th><td class="hl">1.39 × 10⁶ km</td><td class="hl">~2 × 10⁻¹⁰″ at 1 µm</td><td>Solar focal line, 548 AU+</td><td class="hl">≈1,000 × 1,000 px</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="profile" class="mt-24" tabindex="-1" data-section="profile">
+      <div class="flex flex-wrap items-end justify-between gap-4" data-reveal>
+        <h3 class="display text-5xl md:text-6xl">Flight profile</h3>
+        <p class="mono-label">Four phases · ~22 years to focus</p>
+      </div>
+      <ol class="profile" data-stagger>
+        <li class="step"><p class="step-n">01</p><p class="step-v">2035</p><h4>Launch</h4><p>Rideshare to solar escape with the sail stowed and the coronagraph sealed.</p></li>
+        <li class="step"><p class="step-n">02</p><p class="step-v">0.1 AU</p><h4>Perihelion dive</h4><p>The sail unfurls about 21 solar radii from the Sun: maximum push, maximum heat.</p></li>
+        <li class="step"><p class="step-n">03</p><p class="step-v">~22 yr</p><h4>Cruise</h4><p>Coast outward at ≈25 AU a year, crossing the heliopause around year five.</p></li>
+        <li class="step"><p class="step-n">04</p><p class="step-v">548 AU →</p><h4>Focal line</h4><p>Coronagraph on. The Einstein ring resolves and imaging continues outward to ~900 AU.</p></li>
+      </ol>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ======================= FOOTER ======================= -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="grid gap-12 md:grid-cols-[1.4fr_1fr_1.2fr]">
+      <div>
+        <a href="#top" class="brand" aria-label="LUMEN/550, back to top">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="url(#lg-brand)" stroke-width="2"/><circle cx="16" cy="16" r="4.2" fill="#FFB547"/><circle cx="27" cy="16" r="1.9" fill="#5EF2E4"/></svg>
+          <span>LUMEN<small>/550</small></span>
+        </a>
+        <p class="display mt-6 text-3xl text-ink max-w-md" style="line-height:1.1">A lens 1.39 million kilometers wide. <span class="grad-em">We only have to reach the focus.</span></p>
+        <p class="mt-6 inline-flex items-center gap-3 font-mono text-xs uppercase tracking-[.14em] text-mute"><span class="pulse" aria-hidden="true"></span><span aria-hidden="true" data-clock>T−0d 00:00:00</span><span class="sr-only">Concept launch window opens 16 July 2035.</span></p>
+      </div>
+      <nav aria-label="Footer">
+        <p class="mono-label">Explore</p>
+        <ul class="mt-5 grid gap-3 text-[15px]">
+          <li><a class="footer-link" href="#lab">Lens lab</a></li>
+          <li><a class="footer-link" href="#feeds">Deep field feeds</a></li>
+          <li><a class="footer-link" href="#spec">Flight spec</a></li>
+          <li><a class="footer-link" href="#profile">Flight profile</a></li>
+          <li><a class="footer-link" href="https://svs.gsfc.nasa.gov/" target="_blank" rel="noopener">NASA Scientific Visualization Studio ↗</a></li>
+        </ul>
+      </nav>
+      <div>
+        <p class="mono-label">Credits</p>
+        <p class="mt-5 text-sm leading-relaxed text-mute">LUMEN/550 is a design study, not a real mission, and is not affiliated with or endorsed by NASA. Video: NASA’s Scientific Visualization Studio (SVS 13326, 5570, 30082, 5319, 30701). Lens physics follows the NIAC solar gravitational lens studies led by S.&nbsp;G.&nbsp;Turyshev.</p>
+      </div>
+    </div>
+    <div class="mt-14 flex flex-wrap items-center justify-between gap-4 border-t border-[rgba(170,195,255,.11)] pt-6 font-mono text-[11px] uppercase tracking-[.14em] text-dim">
+      <span>© 2026 LUMEN/550 concept study</span>
+      <span>Three.js · GSAP · Tailwind · Lenis</span>
+      <a href="#top" class="footer-link" data-magnetic="0.3">Back to top ↑</a>
+    </div>
+  </div>
+  <span class="wordmark" aria-hidden="true">LUMEN<em>/550</em></span>
+</footer>
+
+<!-- ======================= THEATER ======================= -->
+<dialog id="theater" class="theater" aria-labelledby="theater-title" data-playing="false">
+  <div class="theater-inner">
+    <div class="theater-media">
+      <video id="theater-video" muted loop playsinline preload="metadata" disablepictureinpicture disableremoteplayback></video>
+      <div id="theater-offline" class="theater-offline" hidden>
+        <p class="display text-3xl text-ink">This feed didn’t load.</p>
+        <p class="text-sm">The source host may be blocking this page, or you may be offline. The original is on the SVS page.</p>
+        <p><a id="theater-offline-link" class="btn btn-ghost btn-sm" href="https://svs.gsfc.nasa.gov/" target="_blank" rel="noopener">Open the SVS page ↗</a></p>
+      </div>
+    </div>
+    <div class="theater-bar">
+      <button id="th-play" class="icon-btn" type="button" aria-label="Pause">
+        <svg class="th-ico-pause" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg>
+        <svg class="th-ico-play" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.5 2.5v11l9-5.5z"/></svg>
+      </button>
+      <input id="th-seek" class="range" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek">
+      <span id="th-time" class="theater-time">0:00 / 0:00</span>
+      <a id="th-link" class="btn btn-ghost btn-sm src-link" href="https://svs.gsfc.nasa.gov/" target="_blank" rel="noopener">Source ↗</a>
+      <button id="th-close" class="icon-btn" type="button" aria-label="Close theater"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+    </div>
+    <div class="theater-meta">
+      <p id="theater-kicker" class="mono-label"></p>
+      <h3 id="theater-title" class="display text-4xl md:text-5xl"></h3>
+      <p id="theater-desc" class="max-w-3xl text-[15px] leading-relaxed text-[#A9B4C8]"></p>
+    </div>
+  </div>
+</dialog>
+
+<!-- Cursor layers -->
+<div id="cursor-aura" class="cursor cursor-aura" aria-hidden="true"></div>
+<div id="cursor-ring" class="cursor cursor-ring" aria-hidden="true"><div class="cursor-ring-inner"><span id="cursor-label"></span></div></div>
+<div id="cursor-dot" class="cursor cursor-dot" aria-hidden="true"><i></i></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+
+<!-- ======================= UI / MOTION (vanilla) ======================= -->
+<script>
+(() => {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const root = document.documentElement;
+  const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const FINE = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const hasGSAP = !!(window.gsap && window.ScrollTrigger);
+
+  /* ---------- Smooth scroll (Lenis) ---------- */
+  let lenis = null;
+  if (window.Lenis && !REDUCE) {
+    lenis = new Lenis({ lerp: 0.085, smoothWheel: true, wheelMultiplier: 1 });
+    if (hasGSAP) {
+      lenis.on('scroll', ScrollTrigger.update);
+      gsap.ticker.add((t) => lenis.raf(t * 1000));
+      gsap.ticker.lagSmoothing(0);
+    } else {
+      const raf = (t) => { lenis.raf(t); requestAnimationFrame(raf); };
+      requestAnimationFrame(raf);
+    }
+  }
+  window.__lenis = lenis;
+
+  /* ---------- Anchor navigation ---------- */
+  const nav = $('#nav');
+  const menuBtn = $('#menu-btn');
+  const menu = $('#mobile-menu');
+  function setMenu(open) {
+    nav.dataset.menu = open ? 'open' : 'closed';
+    menu.hidden = !open;
+    menuBtn.setAttribute('aria-expanded', String(open));
+    menuBtn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  }
+  menuBtn.addEventListener('click', () => setMenu(menu.hidden));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { setMenu(false); menuBtn.focus(); } });
+
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    const id = a.getAttribute('href').slice(1);
+    const el = id && document.getElementById(id);
+    if (!el) return;
+    e.preventDefault();
+    setMenu(false);
+    const offset = id === 'top' ? 0 : -84;
+    if (lenis) lenis.scrollTo(id === 'top' ? 0 : el, { offset, duration: 1.5 });
+    else window.scrollTo({ top: id === 'top' ? 0 : el.getBoundingClientRect().top + scrollY + offset, behavior: REDUCE ? 'auto' : 'smooth' });
+    if (id !== 'top') el.focus({ preventScroll: true });
+  });
+
+  /* ---------- Nav state + scroll progress ---------- */
+  const bar = $('#progress');
+  let scrollQueued = false, scrolledState = null;
+  function onScroll() {
+    if (scrollQueued) return;
+    scrollQueued = true;
+    requestAnimationFrame(() => {
+      scrollQueued = false;
+      const y = scrollY;
+      const max = root.scrollHeight - innerHeight;
+      const s = y > 24;
+      if (s !== scrolledState) { scrolledState = s; nav.dataset.scrolled = String(s); }
+      bar.style.transform = 'scaleX(' + (max > 0 ? Math.min(1, y / max) : 0).toFixed(4) + ')';
+    });
+  }
+  addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  const navLinks = $$('[data-nav]');
+  const ORDER = ['top', 'lab', 'feeds', 'spec', 'profile'];
+  const activeSections = new Set();
+  const sectionIO = new IntersectionObserver((entries) => {
+    entries.forEach((en) => { en.isIntersecting ? activeSections.add(en.target.dataset.section) : activeSections.delete(en.target.dataset.section); });
+    const key = ORDER.filter((k) => activeSections.has(k)).pop() || '';
+    navLinks.forEach((l) => l.setAttribute('aria-current', String(l.dataset.nav === key)));
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  $$('[data-section]').forEach((s) => sectionIO.observe(s));
+
+  /* ---------- Mission clock (T− to concept launch window) ---------- */
+  const LAUNCH = Date.UTC(2035, 6, 16, 14, 0, 0);
+  const clocks = $$('[data-clock]');
+  const pad = (n) => String(n).padStart(2, '0');
+  function tickClock() {
+    let s = Math.max(0, Math.floor((LAUNCH - Date.now()) / 1000));
+    const d = Math.floor(s / 86400); s %= 86400;
+    const h = Math.floor(s / 3600); s %= 3600;
+    const m = Math.floor(s / 60); s %= 60;
+    const txt = 'T−' + d.toLocaleString('en-US') + 'd ' + pad(h) + ':' + pad(m) + ':' + pad(s);
+    clocks.forEach((c) => { c.textContent = txt; });
+  }
+  tickClock();
+  let clockTimer = setInterval(tickClock, 1000);
+  document.addEventListener('visibilitychange', () => {
+    clearInterval(clockTimer);
+    if (!document.hidden) { tickClock(); clockTimer = setInterval(tickClock, 1000); }
+  });
+
+  /* ---------- Custom cursor (event-driven, rAF only while moving) ---------- */
+  if (FINE && !REDUCE) {
+    root.dataset.cursorfx = 'on';
+    const dot = $('#cursor-dot'), ring = $('#cursor-ring'), aura = $('#cursor-aura'), label = $('#cursor-label');
+    let x = innerWidth / 2, y = innerHeight / 2, rx = x, ry = y, ax = x, ay = y, raf = 0;
+    const loop = () => {
+      rx += (x - rx) * 0.22; ry += (y - ry) * 0.22;
+      ax += (x - ax) * 0.08; ay += (y - ay) * 0.08;
+      ring.style.transform = 'translate3d(' + rx.toFixed(1) + 'px,' + ry.toFixed(1) + 'px,0)';
+      aura.style.transform = 'translate3d(' + ax.toFixed(1) + 'px,' + ay.toFixed(1) + 'px,0)';
+      raf = (Math.abs(x - ax) + Math.abs(y - ay) > 0.4) ? requestAnimationFrame(loop) : 0;
+    };
+    addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      x = e.clientX; y = e.clientY;
+      dot.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0)';
+      if (root.dataset.cursorShown !== 'true') { root.dataset.cursorShown = 'true'; rx = ax = x; ry = ay = y; }
+      if (!raf) raf = requestAnimationFrame(loop);
+    }, { passive: true });
+    document.addEventListener('mouseout', (e) => { if (!e.relatedTarget) root.dataset.cursorShown = 'false'; });
+    const INTERACTIVE = 'a, button, input, label, select, textarea, summary, [data-cursor]';
+    let labelLock = false;
+    function setCursor(state, text) {
+      if (ring.dataset.state !== state) ring.dataset.state = state;
+      if (label.textContent !== text) label.textContent = text;
+    }
+    document.addEventListener('pointerover', (e) => {
+      const el = e.target.closest(INTERACTIVE);
+      labelLock = false;
+      if (!el) return setCursor('', '');
+      if (el.dataset.cursor) setCursor('label', el.dataset.cursor);
+      else setCursor('hover', '');
+    });
+    addEventListener('pointerdown', () => { ring.dataset.press = 'true'; });
+    addEventListener('pointerup', () => { ring.dataset.press = 'false'; });
+    window.__cursorLabel = (text) => { if (!labelLock) setCursor(text ? 'label' : 'hover', text || ''); };
+  }
+
+  /* ---------- Magnetic buttons ---------- */
+  if (FINE && !REDUCE) {
+    $$('[data-magnetic]').forEach((el) => {
+      const k = parseFloat(el.dataset.magnetic) || 0.25;
+      el.addEventListener('pointermove', (e) => {
+        const r = el.getBoundingClientRect();
+        const mx = e.clientX - (r.left + r.width / 2);
+        const my = e.clientY - (r.top + r.height / 2);
+        el.style.transform = 'translate(' + (mx * k).toFixed(1) + 'px,' + (my * k * 1.2).toFixed(1) + 'px)';
+      });
+      el.addEventListener('pointerleave', () => { el.style.transform = ''; });
+    });
+  }
+
+  /* ---------- Spec cards: shared spotlight border + 3D tilt ---------- */
+  const specGrid = $('#spec-grid');
+  const cards = $$('.glow-card', specGrid);
+  let spotEvent = null, spotRaf = 0;
+  function applySpot() {
+    spotRaf = 0;
+    const e = spotEvent;
+    const rects = cards.map((c) => c.getBoundingClientRect());
+    cards.forEach((c, i) => {
+      const r = rects[i];
+      const px = e.clientX - r.left, py = e.clientY - r.top;
+      c.style.setProperty('--mx', px.toFixed(0) + 'px');
+      c.style.setProperty('--my', py.toFixed(0) + 'px');
+      if (FINE && !REDUCE) {
+        const inside = px >= 0 && py >= 0 && px <= r.width && py <= r.height;
+        c.style.transform = inside
+          ? 'perspective(900px) rotateX(' + ((0.5 - py / r.height) * 7).toFixed(2) + 'deg) rotateY(' + ((px / r.width - 0.5) * 9).toFixed(2) + 'deg)'
+          : '';
+      }
+    });
+  }
+  specGrid.addEventListener('pointermove', (e) => { spotEvent = e; if (!spotRaf) spotRaf = requestAnimationFrame(applySpot); }, { passive: true });
+  specGrid.addEventListener('pointerleave', () => { cards.forEach((c) => { c.style.transform = ''; }); });
+  const specSection = $('#spec');
+  new IntersectionObserver(([en]) => { specSection.dataset.inview = String(en.isIntersecting); }).observe(specSection);
+
+  /* ---------- Hero background video ---------- */
+  const hero = $('#top');
+  const hv = $('#hero-video');
+  const motionBtn = $('#motion-btn');
+  const motionLabel = $('#motion-label');
+  const saveData = !!(navigator.connection && navigator.connection.saveData);
+  let heroPaused = REDUCE;
+  let heroVisible = true;
+  hv.muted = true;
+  hv.addEventListener('loadeddata', () => { hero.dataset.video = 'ready'; });
+  hv.addEventListener('error', () => {
+    hero.dataset.video = 'offline';
+    const c = $('#hero-credit'); if (c) c.textContent = 'Background feed unreachable · live WebGL only';
+  });
+  function syncHeroVideo() {
+    if (!hv.src) return;
+    if (!heroPaused && heroVisible && !document.hidden) { const p = hv.play(); if (p) p.catch(() => {}); }
+    else hv.pause();
+  }
+  function setHeroPaused(p) {
+    heroPaused = p;
+    hero.dataset.paused = String(p);
+    motionBtn.setAttribute('aria-pressed', String(p));
+    motionLabel.textContent = p ? 'Play motion' : 'Pause motion';
+    syncHeroVideo();
+    window.dispatchEvent(new CustomEvent('hero-motion', { detail: { paused: p } }));
+  }
+  if (!saveData) { hv.src = hv.dataset.src; hv.load(); }
+  else { const c = $('#hero-credit'); if (c) c.textContent = 'Data saver on · background video skipped'; }
+  setHeroPaused(heroPaused);
+  motionBtn.addEventListener('click', () => setHeroPaused(!heroPaused));
+  new IntersectionObserver(([en]) => { heroVisible = en.isIntersecting; syncHeroVideo(); }).observe(hero);
+  document.addEventListener('visibilitychange', syncHeroVideo);
+  window.__heroPaused = () => heroPaused;
+
+  /* ---------- Video showcase: lazy load, hover-to-play, pinned play, progress ---------- */
+  const feeds = $$('[data-feed]');
+  const CIRC = 2 * Math.PI * 34;
+  const fmt = (t) => { if (!isFinite(t)) return '—:—'; t = Math.max(0, Math.round(t)); return Math.floor(t / 60) + ':' + pad(t % 60); };
+  let feedsVisible = false;
+
+  function loadFeed(card) {
+    const v = $('video', card);
+    if (v.dataset.loaded) return;
+    v.dataset.loaded = '1';
+    card.dataset.state = 'loading';
+    v.preload = 'metadata';
+    v.src = v.dataset.src;
+    v.load();
+  }
+  function setPlaying(card, on) {
+    const v = $('video', card);
+    if (card.dataset.state === 'offline') return;
+    if (on) {
+      loadFeed(card);
+      const p = v.play(); if (p) p.catch(() => {});
+      card.dataset.playing = 'true';
+    } else {
+      v.pause();
+      card.dataset.playing = 'false';
+    }
+    $('.play', card).setAttribute('aria-label', (card.dataset.pinned === 'true' ? 'Pause ' : 'Play ') + card.dataset.title);
+  }
+
+  feeds.forEach((card) => {
+    const v = $('video', card);
+    const status = $('[data-status]', card);
+    const statusText = status.textContent;
+    const dur = $('[data-dur]', card);
+    const prog = $('.prog', card);
+    const playBtn = $('.play', card);
+    prog.style.strokeDasharray = CIRC.toFixed(2);
+    prog.style.strokeDashoffset = CIRC.toFixed(2);
+
+    v.addEventListener('loadedmetadata', () => { dur.textContent = fmt(v.duration); });
+    v.addEventListener('loadeddata', () => { if (card.dataset.state !== 'offline') { card.dataset.state = 'ready'; status.textContent = statusText; } });
+    v.addEventListener('waiting', () => { if (card.dataset.playing === 'true') status.textContent = 'Buffering'; });
+    v.addEventListener('playing', () => { status.textContent = statusText; });
+    v.addEventListener('error', () => {
+      card.dataset.state = 'offline'; card.dataset.playing = 'false';
+      status.textContent = 'Offline';
+      dur.textContent = 'CSS render';
+    });
+    v.addEventListener('timeupdate', () => {
+      if (!v.duration) return;
+      if (status.textContent !== statusText && !v.paused) status.textContent = statusText;
+      prog.style.strokeDashoffset = (CIRC * (1 - v.currentTime / v.duration)).toFixed(2);
+    });
+
+    card.addEventListener('pointerenter', (e) => {
+      if (e.pointerType !== 'mouse' || card.dataset.hold === 'true') return;
+      setPlaying(card, true);
+    });
+    card.addEventListener('pointerleave', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      card.dataset.hold = 'false';
+      if (card.dataset.pinned !== 'true') setPlaying(card, false);
+    });
+    card.addEventListener('focusin', (e) => { if (e.target.matches(':focus-visible') && card.dataset.pinned !== 'true') setPlaying(card, true); });
+    card.addEventListener('focusout', (e) => { if (!card.contains(e.relatedTarget) && card.dataset.pinned !== 'true') setPlaying(card, false); });
+
+    playBtn.addEventListener('click', () => {
+      if (card.dataset.pinned === 'true') {
+        card.dataset.pinned = 'false'; card.dataset.hold = 'true';
+        setPlaying(card, false);
+      } else {
+        card.dataset.pinned = 'true'; card.dataset.hold = 'false';
+        setPlaying(card, true);
+      }
+    });
+    $('.feed-open', card).addEventListener('click', () => openTheater(card));
+  });
+
+  const lazyIO = new IntersectionObserver((entries) => {
+    entries.forEach((en) => { if (en.isIntersecting) { loadFeed(en.target); lazyIO.unobserve(en.target); } });
+  }, { rootMargin: '200px 0px' });
+  feeds.forEach((f) => lazyIO.observe(f));
+
+  new IntersectionObserver(([en]) => {
+    feedsVisible = en.isIntersecting;
+    feeds.forEach((card) => {
+      if (card.dataset.pinned !== 'true') return;
+      const v = $('video', card);
+      if (feedsVisible) { const p = v.play(); if (p) p.catch(() => {}); } else v.pause();
+    });
+  }).observe($('#feeds'));
+
+  /* ---------- Theater (native <dialog>) ---------- */
+  const dlg = $('#theater');
+  const tv = $('#theater-video');
+  const thPlay = $('#th-play'), thSeek = $('#th-seek'), thTime = $('#th-time');
+  const thOffline = $('#theater-offline');
+  let seeking = false;
+  function setTheaterPlaying(on) {
+    dlg.dataset.playing = String(on);
+    thPlay.setAttribute('aria-label', on ? 'Pause' : 'Play');
+  }
+  function openTheater(card) {
+    feeds.forEach((c) => { if (c.dataset.pinned !== 'true') setPlaying(c, false); });
+    $('#theater-title').textContent = card.dataset.title;
+    $('#theater-kicker').textContent = card.dataset.kicker;
+    $('#theater-desc').textContent = card.dataset.desc;
+    $('#th-link').href = card.dataset.page;
+    $('#theater-offline-link').href = card.dataset.page;
+    thOffline.hidden = true;
+    thSeek.value = 0; thSeek.style.setProperty('--fill', '0%');
+    thTime.textContent = '0:00 / 0:00';
+    root.dataset.theater = 'open';
+    if (lenis) lenis.stop();
+    dlg.showModal();
+    tv.src = $('video', card).dataset.src;
+    tv.load();
+    const p = tv.play(); if (p) p.catch(() => setTheaterPlaying(false));
+    setTheaterPlaying(true);
+  }
+  tv.addEventListener('error', () => { if (tv.getAttribute('src')) { thOffline.hidden = false; setTheaterPlaying(false); } });
+  tv.addEventListener('play', () => setTheaterPlaying(true));
+  tv.addEventListener('pause', () => setTheaterPlaying(false));
+  tv.addEventListener('timeupdate', () => {
+    if (!tv.duration) return;
+    thTime.textContent = fmt(tv.currentTime) + ' / ' + fmt(tv.duration);
+    if (!seeking) {
+      const f = tv.currentTime / tv.duration;
+      thSeek.value = Math.round(f * 1000);
+      thSeek.style.setProperty('--fill', (f * 100).toFixed(2) + '%');
+    }
+  });
+  thSeek.addEventListener('input', () => {
+    seeking = true;
+    thSeek.style.setProperty('--fill', (thSeek.value / 10) + '%');
+    if (tv.duration) tv.currentTime = (thSeek.value / 1000) * tv.duration;
+  });
+  thSeek.addEventListener('change', () => { seeking = false; });
+  thPlay.addEventListener('click', () => { if (tv.paused) { const p = tv.play(); if (p) p.catch(() => {}); } else tv.pause(); });
+  $('#th-close').addEventListener('click', () => dlg.close());
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+  dlg.addEventListener('close', () => {
+    tv.pause();
+    tv.removeAttribute('src');
+    tv.load();
+    root.dataset.theater = 'closed';
+    if (lenis) lenis.start();
+  });
+
+  /* ---------- GSAP choreography ---------- */
+  if (hasGSAP && !REDUCE) {
+    gsap.registerPlugin(ScrollTrigger);
+    const intro = gsap.timeline({ defaults: { ease: 'expo.out' } });
+    intro
+      .from('.nav-bar', { y: -28, opacity: 0, duration: 1.2 }, 0.1)
+      .from('.hero .word', { yPercent: 118, rotate: 5, duration: 1.6, stagger: 0.075, clearProps: 'transform' }, 0.2)
+      .from('[data-hero-fade]', { y: 26, opacity: 0, duration: 1.3, stagger: 0.1 }, 0.6)
+      .from('.hero-card', { y: 40, opacity: 0, duration: 1.4 }, 0.9);
+
+    gsap.to('.hero-media', { yPercent: 16, scale: 1.08, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } });
+    gsap.to('.hero-content', { yPercent: -10, opacity: 0.12, ease: 'none', scrollTrigger: { trigger: '.hero', start: '5% top', end: 'bottom 15%', scrub: true } });
+
+    $$('[data-reveal]').forEach((el) => {
+      gsap.from(el, { y: 46, opacity: 0.12, duration: 1.4, ease: 'expo.out', clearProps: 'transform,opacity', scrollTrigger: { trigger: el, start: 'top 88%', once: true } });
+    });
+    $$('[data-stagger]').forEach((g) => {
+      gsap.from(g.children, { y: 56, opacity: 0.12, duration: 1.4, ease: 'expo.out', stagger: 0.08, clearProps: 'transform,opacity', scrollTrigger: { trigger: g, start: 'top 86%', once: true } });
+    });
+    gsap.fromTo('#viewport',
+      { clipPath: 'inset(7% 5% 7% 5% round 44px)' },
+      { clipPath: 'inset(0% 0% 0% 0% round 30px)', ease: 'none', scrollTrigger: { trigger: '#viewport', start: 'top 98%', end: 'top 40%', scrub: true } });
+    gsap.from('.wordmark', { yPercent: 45, opacity: 0.3, ease: 'none', scrollTrigger: { trigger: '.footer', start: 'top bottom', end: 'bottom bottom', scrub: true } });
+    addEventListener('load', () => ScrollTrigger.refresh());
+  }
+})();
+</script>
+
+<!-- ======================= THREE.JS (hero spacetime + lens lab) ======================= -->
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const COARSE = matchMedia('(pointer: coarse)').matches;
+const SMALL = Math.min(innerWidth, innerHeight) < 700;
+
+/* Ashima Arts 3D simplex noise (MIT) */
+const NOISE = /* glsl */`
+vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+float snoise(vec3 v){
+  const vec2 C=vec2(1.0/6.0,1.0/3.0);
+  const vec4 D=vec4(0.0,0.5,1.0,2.0);
+  vec3 i=floor(v+dot(v,C.yyy));
+  vec3 x0=v-i+dot(i,C.xxx);
+  vec3 g=step(x0.yzx,x0.xyz);
+  vec3 l=1.0-g;
+  vec3 i1=min(g.xyz,l.zxy);
+  vec3 i2=max(g.xyz,l.zxy);
+  vec3 x1=x0-i1+C.xxx;
+  vec3 x2=x0-i2+C.yyy;
+  vec3 x3=x0-D.yyy;
+  i=mod289(i);
+  vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));
+  float n_=0.142857142857;
+  vec3 ns=n_*D.wyz-D.xzx;
+  vec4 j=p-49.0*floor(p*ns.z*ns.z);
+  vec4 x_=floor(j*ns.z);
+  vec4 y_=floor(j-7.0*x_);
+  vec4 x=x_*ns.x+ns.yyyy;
+  vec4 y=y_*ns.x+ns.yyyy;
+  vec4 h=1.0-abs(x)-abs(y);
+  vec4 b0=vec4(x.xy,y.xy);
+  vec4 b1=vec4(x.zw,y.zw);
+  vec4 s0=floor(b0)*2.0+1.0;
+  vec4 s1=floor(b1)*2.0+1.0;
+  vec4 sh=-step(h,vec4(0.0));
+  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;
+  vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+  vec3 p0=vec3(a0.xy,h.x);
+  vec3 p1=vec3(a0.zw,h.y);
+  vec3 p2=vec3(a1.xy,h.z);
+  vec3 p3=vec3(a1.zw,h.w);
+  vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+  vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0);
+  m=m*m;
+  return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+}
+`;
+
+function hasWebGL() {
+  try { const c = document.createElement('canvas'); return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl'))); }
+  catch (e) { return false; }
+}
+
+/* Render only while on screen and the tab is visible. frame() may return false to idle. */
+function visibleLoop(el, frame) {
+  let visible = false, raf = 0, last = 0;
+  const tick = (now) => {
+    raf = 0;
+    if (!visible || document.hidden) return;
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    if (frame(dt, now / 1000) === false) return;
+    raf = requestAnimationFrame(tick);
+  };
+  const start = () => { if (!raf && visible && !document.hidden) { last = performance.now(); raf = requestAnimationFrame(tick); } };
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) start(); }, { rootMargin: '120px 0px' }).observe(el);
+  document.addEventListener('visibilitychange', start);
+  return { start };
+}
+
+/* Blackbody color (Tanner Helland fit), gamma-pushed so pale stellar whites read as color on screen */
+function kelvinRGB(k) {
+  const t = k / 100;
+  let r, g, b;
+  if (t <= 66) {
+    r = 255;
+    g = 99.4708025861 * Math.log(t) - 161.1195681661;
+    b = t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307;
+  } else {
+    r = 329.698727446 * Math.pow(t - 60, -0.1332047592);
+    g = 288.1221695283 * Math.pow(t - 60, -0.0755148492);
+    b = 255;
+  }
+  const c = (v) => Math.pow(Math.max(0, Math.min(255, v)) / 255, 2.8);
+  return [c(r), c(g), c(b)];
+}
+const displayCSS = (a) => 'rgb(' + a.map((v) => Math.round(v * 255)).join(' ') + ')';
+function spectralClass(k) { return k >= 30000 ? 'O' : k >= 10000 ? 'B' : k >= 7500 ? 'A' : k >= 6000 ? 'F' : k >= 5200 ? 'G' : k >= 3700 ? 'K' : 'M'; }
+
+if (!hasWebGL()) {
+  document.documentElement.dataset.webgl = 'off';
+} else {
+  try { initHero(); } catch (err) { console.warn('[LUMEN] hero scene disabled:', err); }
+  try { initLab(); } catch (err) { console.warn('[LUMEN] lens lab disabled:', err); document.documentElement.dataset.webgl = 'off'; }
+}
+
+/* =====================================================================
+   HERO — spacetime fabric: a gravity well under the video, a second
+   mass that follows the cursor, and gravitational-wave ripples.
+   ===================================================================== */
+function initHero() {
+  const hero = document.getElementById('top');
+  const canvas = document.getElementById('hero-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !SMALL, alpha: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, SMALL ? 1.5 : 1.75));
+  renderer.setClearColor(0x000000, 0);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 120);
+  const camBase = new THREE.Vector3(0, 6.2, 11.8);
+  const look = new THREE.Vector3(0, -2.5, 0);
+
+  const N = SMALL ? 46 : 70, SEG = SMALL ? 110 : 170, SIZE = 32, HALF = SIZE / 2;
+  const pts = new Float32Array((N + 1) * SEG * 2 * 2 * 3);
+  let o = 0;
+  for (let i = 0; i <= N; i++) {
+    const c = -HALF + (SIZE * i) / N;
+    for (let s = 0; s < SEG; s++) {
+      const a = -HALF + (SIZE * s) / SEG, b = -HALF + (SIZE * (s + 1)) / SEG;
+      pts.set([a, 0, c, b, 0, c, c, 0, a, c, 0, b], o); o += 12;
+    }
+  }
+  const gridGeo = new THREE.BufferGeometry();
+  gridGeo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+
+  const U = {
+    uTime: { value: 0 }, uMass: { value: 2.3 }, uMouse: { value: new THREE.Vector2(5, 2) }, uMouseMass: { value: 0.95 },
+    uFade: { value: 1 }, uPR: { value: renderer.getPixelRatio() },
+    uA: { value: new THREE.Color('#5EF2E4') }, uB: { value: new THREE.Color('#FFB547') }, uC: { value: new THREE.Color('#FF5E7E') },
+  };
+
+  const grid = new THREE.LineSegments(gridGeo, new THREE.ShaderMaterial({
+    uniforms: U, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: /* glsl */`
+      uniform float uTime; uniform float uMass; uniform float uMouseMass; uniform vec2 uMouse;
+      varying float vDepth; varying float vDist; varying float vView;
+      float well(vec2 p, vec2 c, float m, float s){ vec2 d = p - c; return -m / sqrt(dot(d, d) + s); }
+      void main(){
+        vec3 p = position;
+        float d = length(p.xz);
+        float y = well(p.xz, vec2(0.0), uMass, 0.55) + well(p.xz, uMouse, uMouseMass, 0.4);
+        y += 0.075 * sin(d * 1.55 - uTime * 1.4) * smoothstep(0.6, 3.5, d) * exp(-d * 0.085);
+        p.y = y;
+        vDepth = -y; vDist = d;
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        vView = -mv.z;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uA; uniform vec3 uB; uniform vec3 uC; uniform float uFade;
+      varying float vDepth; varying float vDist; varying float vView;
+      void main(){
+        float edge = 1.0 - smoothstep(7.5, 15.5, vDist);
+        float near = smoothstep(1.5, 6.5, vView);
+        float deep = smoothstep(0.35, 1.7, vDepth);
+        vec3 col = mix(uA, uB, deep);
+        col = mix(col, uC, smoothstep(1.9, 3.1, vDepth));
+        float a = edge * near * (0.2 + deep * 0.6) * uFade;
+        gl_FragColor = vec4(col, a);
+        #include <colorspace_fragment>
+      }`,
+  }));
+  scene.add(grid);
+
+  // Photon ring resting in the well
+  const ringY = -2.3 / Math.sqrt(0.62 * 0.62 + 0.55);
+  const photon = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.014, 8, 160), new THREE.MeshBasicMaterial({ color: 0xffc26b, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+  photon.rotation.x = Math.PI / 2; photon.position.y = ringY;
+  scene.add(photon);
+
+  // Drifting dust
+  const DUST = SMALL ? 320 : 700;
+  const dPos = new Float32Array(DUST * 3), dSeed = new Float32Array(DUST);
+  for (let i = 0; i < DUST; i++) {
+    dPos[i * 3] = (Math.random() - 0.5) * 28;
+    dPos[i * 3 + 1] = Math.random() * 8 - 3;
+    dPos[i * 3 + 2] = (Math.random() - 0.5) * 20 - 3;
+    dSeed[i] = Math.random();
+  }
+  const dustGeo = new THREE.BufferGeometry();
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(dPos, 3));
+  dustGeo.setAttribute('aSeed', new THREE.BufferAttribute(dSeed, 1));
+  const dust = new THREE.Points(dustGeo, new THREE.ShaderMaterial({
+    uniforms: U, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: /* glsl */`
+      attribute float aSeed; uniform float uTime; uniform float uPR;
+      varying float vA; varying float vSeed;
+      void main(){
+        vec3 p = position;
+        p.y = mod(p.y + uTime * (0.07 + aSeed * 0.12) + 3.0, 8.0) - 3.0;
+        p.x += sin(uTime * 0.2 + aSeed * 20.0) * 0.3;
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = (1.0 + aSeed * 2.4) * uPR * (10.0 / -mv.z);
+        vA = (0.35 + 0.65 * abs(sin(uTime * 0.8 + aSeed * 40.0))) * smoothstep(-3.0, -2.0, p.y) * (1.0 - smoothstep(4.0, 5.0, p.y));
+        vSeed = aSeed;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uA; uniform vec3 uB; uniform float uFade;
+      varying float vA; varying float vSeed;
+      void main(){
+        float d = length(gl_PointCoord - 0.5);
+        if (d > 0.5) discard;
+        float a = smoothstep(0.5, 0.0, d);
+        gl_FragColor = vec4(mix(uA, uB, step(0.7, vSeed)), a * a * vA * uFade * 0.9);
+        #include <colorspace_fragment>
+      }`,
+  }));
+  scene.add(dust);
+
+  // Pointer → second mass on the fabric
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.6);
+  const hit = new THREE.Vector3();
+  const mouseTarget = new THREE.Vector2(5, 2);
+  let lastMove = -1e9, px = 0, py = 0, sx = 0, sy = 0;
+  let heroH = hero.offsetHeight;
+
+  hero.addEventListener('pointermove', (e) => {
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    px = ndc.x; py = ndc.y;
+    ray.setFromCamera(ndc, camera);
+    if (ray.ray.intersectPlane(plane, hit)) {
+      mouseTarget.set(THREE.MathUtils.clamp(hit.x, -13, 13), THREE.MathUtils.clamp(hit.z, -13, 9));
+      lastMove = performance.now();
+    }
+  }, { passive: true });
+
+  function resize() {
+    const w = hero.clientWidth, h = hero.clientHeight;
+    heroH = h;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.fov = camera.aspect < 0.8 ? 62 : camera.aspect < 1.2 ? 50 : 40;
+    camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(hero);
+  resize();
+
+  let paused = typeof window.__heroPaused === 'function' ? window.__heroPaused() : REDUCE;
+  let t = 0;
+  const loop = visibleLoop(hero, (dt) => {
+    if (!paused) t += dt * (REDUCE ? 0.3 : 1);
+    U.uTime.value = t;
+    const now = performance.now();
+    if (now - lastMove > 3500) mouseTarget.set(Math.cos(t * 0.21) * 6.5, Math.sin(t * 0.29) * 4 + 1);
+    U.uMouse.value.lerp(mouseTarget, 1 - Math.pow(0.002, dt));
+    sx += (px - sx) * (1 - Math.pow(0.02, dt));
+    sy += (py - sy) * (1 - Math.pow(0.02, dt));
+    const p = Math.min(1, Math.max(0, scrollY / Math.max(1, heroH)));
+    camera.position.set(camBase.x + sx * 0.7, camBase.y + p * 2.4 - sy * 0.35, camBase.z - p * 1.6);
+    camera.lookAt(look);
+    U.uFade.value = 1 - p * 0.75;
+    photon.material.opacity = 0.75 + 0.2 * Math.sin(t * 2.0);
+    renderer.render(scene, camera);
+    return !paused || now - lastMove < 1200;
+  });
+  hero.addEventListener('pointermove', () => loop.start(), { passive: true });
+  addEventListener('scroll', () => loop.start(), { passive: true });
+  addEventListener('hero-motion', (e) => { paused = e.detail.paused; loop.start(); });
+}
+
+/* =====================================================================
+   LENS LAB — procedural star, corona, probe orbits, Einstein ring
+   ===================================================================== */
+function initLab() {
+  const vp = document.getElementById('viewport');
+  const canvas = document.getElementById('lab-canvas');
+  const lab = document.getElementById('lab');
+  const $ = (id) => document.getElementById(id);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  let pr = Math.min(devicePixelRatio || 1, SMALL ? 1.5 : 1.75);
+  renderer.setPixelRatio(pr);
+  renderer.setClearColor(0x04060c, 1);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.95;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 400);
+  const HOME = new THREE.Vector3(0.9, 1.7, 8.2);
+  camera.position.copy(HOME);
+
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.enablePan = false;
+  controls.minDistance = 3.4;
+  controls.maxDistance = 15;
+  controls.rotateSpeed = 0.55;
+  controls.zoomSpeed = 0.7;
+  controls.enableZoom = COARSE;
+  canvas.style.touchAction = 'pan-y';
+
+  const R = 1.4;
+  const U = {
+    uTime: { value: 0 }, uSim: { value: 0 }, uTurb: { value: 0.35 }, uFlare: { value: 0 },
+    uColor: { value: new THREE.Color() }, uAccent: { value: new THREE.Color() },
+    uPR: { value: pr }, uPointSize: { value: 2.6 },
+  };
+
+  /* ---- Star (three render modes share one uniform set) ---- */
+  const starVert = NOISE + /* glsl */`
+    uniform float uTime; uniform float uTurb; uniform float uFlare; uniform float uPR; uniform float uPointSize;
+    varying vec3 vN; varying vec3 vV; varying vec3 vObj; varying float vDisp;
+    void main(){
+      vec3 n = normalize(normal);
+      vec3 p = position;
+      float t = uTime * 0.11;
+      float d = snoise(n * 1.3 + vec3(t, t * 0.7, -t)) * 0.65 + snoise(n * 3.4 - vec3(t * 1.6)) * 0.3;
+      d *= uTurb;
+      d += uFlare * 0.2 * (0.6 + 0.4 * snoise(n * 5.0 + uTime));
+      vDisp = d;
+      p += n * d * 0.24;
+      vObj = n;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vN = normalize(normalMatrix * n);
+      vV = normalize(-mv.xyz);
+      gl_Position = projectionMatrix * mv;
+      #ifdef IS_POINTS
+        gl_PointSize = uPointSize * uPR * (7.0 / -mv.z) * (1.0 + d * 1.5);
+      #endif
+    }`;
+  const starFrag = NOISE + /* glsl */`
+    uniform vec3 uColor; uniform vec3 uAccent; uniform float uTime; uniform float uFlare;
+    varying vec3 vN; varying vec3 vV; varying vec3 vObj; varying float vDisp;
+    float fbm(vec3 p){ float f = 0.0; float a = 0.5; for (int i = 0; i < 4; i++){ f += a * snoise(p); p *= 2.07; a *= 0.5; } return f; }
+    void main(){
+      float mu = clamp(dot(normalize(vN), normalize(vV)), 0.0, 1.0);
+      float t = uTime * 0.04;
+      float gran = fbm(vObj * 6.5 + vec3(0.0, t, t * 0.6));
+      float spot = smoothstep(0.64, 0.88, snoise(vObj * 1.1 + vec3(t * 0.4, 0.0, 0.0)));
+      vec3 deepC = uColor * uColor;
+      vec3 hot = mix(uColor, vec3(1.0), 0.25);
+      vec3 col = mix(deepC * 0.85, hot * 1.45, smoothstep(-0.55, 0.65, gran + vDisp * 1.2));
+      col *= mix(1.0, 0.45, spot);
+      col *= 0.42 + 0.58 * pow(mu, 0.5);
+      float rim = pow(1.0 - mu, 2.4);
+      col += (uColor * 0.8 + uAccent * 0.5) * rim;
+      col *= 1.0 + uFlare * 1.8;
+      float alpha = 1.0;
+      #ifdef IS_POINTS
+        float pd = length(gl_PointCoord - 0.5);
+        if (pd > 0.5) discard;
+        alpha = smoothstep(0.5, 0.05, pd);
+        col = mix(col, uAccent * 1.5, 0.22) * 1.3;
+      #endif
+      #ifdef IS_WIRE
+        col = mix(col, uAccent * 1.4, 0.35 + 0.35 * rim);
+        alpha = 0.5 + 0.5 * mu;
+      #endif
+      gl_FragColor = vec4(col, alpha);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`;
+
+  const solidMat = new THREE.ShaderMaterial({ uniforms: U, vertexShader: starVert, fragmentShader: starFrag });
+  const wireMat = new THREE.ShaderMaterial({ uniforms: U, vertexShader: starVert, fragmentShader: starFrag, defines: { IS_WIRE: '' }, wireframe: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  const ptsMat = new THREE.ShaderMaterial({ uniforms: U, vertexShader: starVert, fragmentShader: starFrag, defines: { IS_POINTS: '' }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+
+  function fibSphere(n, r) {
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
+    const ga = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < n; i++) {
+      const y = 1 - (i / (n - 1)) * 2, rad = Math.sqrt(1 - y * y), th = ga * i;
+      const x = Math.cos(th) * rad, z = Math.sin(th) * rad;
+      pos[i * 3] = x * r; pos[i * 3 + 1] = y * r; pos[i * 3 + 2] = z * r;
+      nor[i * 3] = x; nor[i * 3 + 1] = y; nor[i * 3 + 2] = z;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    return g;
+  }
+
+  const starGroup = new THREE.Group();
+  const starSolid = new THREE.Mesh(new THREE.IcosahedronGeometry(R, SMALL ? 32 : 48), solidMat);
+  const starWire = new THREE.Mesh(new THREE.IcosahedronGeometry(R, 12), wireMat);
+  const starPts = new THREE.Points(fibSphere(SMALL ? 6000 : 11000, R), ptsMat);
+  starWire.visible = false; starPts.visible = false;
+  starGroup.add(starSolid, starWire, starPts);
+  scene.add(starGroup);
+
+  /* ---- Corona shell + soft bloom sprite ---- */
+  const corona = new THREE.Mesh(new THREE.SphereGeometry(R * 1.45, 64, 48), new THREE.ShaderMaterial({
+    uniforms: { uColor: U.uColor, uAccent: U.uAccent, uTime: U.uTime, uFlare: U.uFlare },
+    side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: /* glsl */`
+      varying vec3 vN; varying vec3 vV; varying vec3 vDir;
+      void main(){ vDir = normalize(position); vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: NOISE + /* glsl */`
+      uniform vec3 uColor; uniform vec3 uAccent; uniform float uTime; uniform float uFlare;
+      varying vec3 vN; varying vec3 vV; varying vec3 vDir;
+      void main(){
+        float k = clamp(-dot(normalize(vN), normalize(vV)) / 0.72, 0.0, 1.0);
+        float g = pow(k, 2.8);
+        float s = 0.68 + 0.32 * snoise(vDir * 2.6 + vec3(0.0, uTime * 0.12, 0.0));
+        vec3 col = mix(uColor, uAccent, 0.2) * g * s * (1.25 + uFlare * 2.2);
+        gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  }));
+  scene.add(corona);
+
+  const gc = document.createElement('canvas'); gc.width = gc.height = 256;
+  const g2 = gc.getContext('2d');
+  const grd = g2.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.18, 'rgba(255,255,255,.5)');
+  grd.addColorStop(0.45, 'rgba(255,255,255,.1)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g2.fillStyle = grd; g2.fillRect(0, 0, 256, 256);
+  const glowTex = new THREE.CanvasTexture(gc); glowTex.colorSpace = THREE.SRGBColorSpace;
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.45 }));
+  glow.scale.setScalar(9.5);
+  scene.add(glow);
+
+  /* ---- Probe orbits: comet-lit rings + GPU-animated swarms ---- */
+  const ringVert = /* glsl */`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  const ringFrag = /* glsl */`
+    uniform vec3 uAccent; uniform float uSim; uniform float uSpeed; uniform float uOffset;
+    varying vec2 vUv;
+    void main(){
+      float a = fract(vUv.x - uSim * uSpeed + uOffset);
+      float i = 0.14 + pow(a, 3.0) * 0.4 + pow(a, 18.0) * 2.2;
+      gl_FragColor = vec4(uAccent * i, 1.0);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`;
+  const probeVert = /* glsl */`
+    attribute float aAngle; attribute float aSpeed; attribute vec3 aJitter; attribute float aSize; attribute float aMix;
+    uniform float uSim; uniform float uRadius; uniform float uPR;
+    varying float vB; varying float vMix;
+    void main(){
+      float a = aAngle + uSim * aSpeed;
+      vec3 p = vec3(cos(a) * uRadius, 0.0, sin(a) * uRadius) + aJitter;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      gl_PointSize = aSize * uPR * (8.0 / -mv.z);
+      vB = 0.6 + 0.4 * sin(uSim * 3.0 + aAngle * 10.0);
+      vMix = aMix;
+      gl_Position = projectionMatrix * mv;
+    }`;
+  const probeFrag = /* glsl */`
+    uniform vec3 uAccent; uniform vec3 uGold;
+    varying float vB; varying float vMix;
+    void main(){
+      float d = length(gl_PointCoord - 0.5);
+      if (d > 0.5) discard;
+      float a = smoothstep(0.5, 0.0, d);
+      gl_FragColor = vec4(mix(uAccent, uGold, step(0.72, vMix)) * vB * 1.6, a * a);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`;
+  const gold = { value: new THREE.Color('#FFB547') };
+  const ringDefs = [
+    { r: 2.35, incl: 0.3, node: 0.0, speed: 0.11, n: 260 },
+    { r: 3.1, incl: -0.55, node: 1.2, speed: 0.075, n: 320 },
+    { r: 3.95, incl: 0.95, node: 2.4, speed: 0.05, n: 380 },
+  ];
+  const ringsRoot = new THREE.Group();
+  const probeObjs = [];
+  const ringObjs = ringDefs.map((d, idx) => {
+    const group = new THREE.Group();
+    group.rotation.order = 'YXZ';
+    group.rotation.set(d.incl, d.node, 0);
+    const torus = new THREE.Mesh(new THREE.TorusGeometry(d.r, 0.0065, 6, 360), new THREE.ShaderMaterial({
+      uniforms: { uAccent: U.uAccent, uSim: U.uSim, uSpeed: { value: d.speed }, uOffset: { value: idx * 0.33 } },
+      vertexShader: ringVert, fragmentShader: ringFrag, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    torus.rotation.x = Math.PI / 2;
+    group.add(torus);
+    const n = SMALL ? Math.round(d.n * 0.6) : d.n;
+    const ang = new Float32Array(n), spd = new Float32Array(n), jit = new Float32Array(n * 3), size = new Float32Array(n), mix = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      ang[i] = Math.random() * Math.PI * 2;
+      spd[i] = (0.28 / d.r) * 2.2 * (0.75 + Math.random() * 0.5);
+      jit[i * 3] = (Math.random() - 0.5) * 0.14; jit[i * 3 + 1] = (Math.random() - 0.5) * 0.08; jit[i * 3 + 2] = (Math.random() - 0.5) * 0.14;
+      size[i] = 0.8 + Math.random() * 2.6;
+      mix[i] = Math.random();
+    }
+    const pg = new THREE.BufferGeometry();
+    pg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    pg.setAttribute('aAngle', new THREE.BufferAttribute(ang, 1));
+    pg.setAttribute('aSpeed', new THREE.BufferAttribute(spd, 1));
+    pg.setAttribute('aJitter', new THREE.BufferAttribute(jit, 3));
+    pg.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+    pg.setAttribute('aMix', new THREE.BufferAttribute(mix, 1));
+    pg.boundingSphere = new THREE.Sphere(new THREE.Vector3(), d.r + 0.5);
+    const probes = new THREE.Points(pg, new THREE.ShaderMaterial({
+      uniforms: { uAccent: U.uAccent, uGold: gold, uSim: U.uSim, uRadius: { value: d.r }, uPR: U.uPR },
+      vertexShader: probeVert, fragmentShader: probeFrag, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    group.add(probes);
+    probeObjs.push(probes);
+    ringsRoot.add(group);
+    return { group, torus, node: d.node };
+  });
+  scene.add(ringsRoot);
+
+  /* ---- Einstein ring (camera-facing) ---- */
+  const einstein = new THREE.Mesh(new THREE.PlaneGeometry(7.6, 7.6), new THREE.ShaderMaterial({
+    uniforms: { uAccent: U.uAccent, uTime: U.uTime },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: ringVert,
+    fragmentShader: NOISE + /* glsl */`
+      uniform vec3 uAccent; uniform float uTime; varying vec2 vUv;
+      void main(){
+        vec2 p = vUv * 2.0 - 1.0;
+        float r = length(p);
+        float ang = atan(p.y, p.x);
+        float ring = exp(-pow((r - 0.72) / 0.009, 2.0));
+        float halo = exp(-pow((r - 0.72) / 0.07, 2.0)) * 0.12;
+        float arcs = 0.45 + 0.55 * smoothstep(-0.3, 0.6, snoise(vec3(cos(ang) * 1.6, sin(ang) * 1.6, uTime * 0.2)));
+        vec3 col = uAccent * (ring * 0.95 + halo) * arcs;
+        gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  }));
+  scene.add(einstein);
+
+  /* ---- Focal axis (the line the fleet flies along) ---- */
+  const axisGeo = new THREE.BufferGeometry();
+  axisGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([R * 1.6, 0, 0, 40, 0, 0]), 3));
+  axisGeo.setAttribute('aT', new THREE.BufferAttribute(new Float32Array([0, 1]), 1));
+  const axis = new THREE.Line(axisGeo, new THREE.ShaderMaterial({
+    uniforms: { uAccent: U.uAccent, uSim: U.uSim, uGold: gold },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: /* glsl */`attribute float aT; varying float vT; void main(){ vT = aT; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uAccent; uniform vec3 uGold; uniform float uSim; varying float vT;
+      void main(){
+        float dash = step(0.45, fract(vT * 90.0 - uSim * 0.6));
+        float fade = (1.0 - smoothstep(0.1, 0.9, vT)) * smoothstep(0.0, 0.02, vT);
+        gl_FragColor = vec4(mix(uGold, uAccent, vT) * dash * fade * 0.8, 1.0);
+        #include <colorspace_fragment>
+      }`,
+  }));
+  scene.add(axis);
+
+  /* ---- Flare pulse ---- */
+  const pulse = new THREE.Mesh(new THREE.IcosahedronGeometry(R * 1.02, 3), new THREE.MeshBasicMaterial({ wireframe: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  pulse.visible = false;
+  scene.add(pulse);
+
+  /* ---- Starfield ---- */
+  const SN = SMALL ? 1400 : 2600;
+  const sPos = new Float32Array(SN * 3), sSize = new Float32Array(SN), sSeed = new Float32Array(SN);
+  for (let i = 0; i < SN; i++) {
+    const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rr = 60 + Math.random() * 70, s = Math.sqrt(1 - u * u);
+    sPos[i * 3] = Math.cos(th) * s * rr; sPos[i * 3 + 1] = u * rr; sPos[i * 3 + 2] = Math.sin(th) * s * rr;
+    sSize[i] = 0.6 + Math.pow(Math.random(), 4) * 2.8; sSeed[i] = Math.random();
+  }
+  const sGeo = new THREE.BufferGeometry();
+  sGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+  sGeo.setAttribute('aSize', new THREE.BufferAttribute(sSize, 1));
+  sGeo.setAttribute('aSeed', new THREE.BufferAttribute(sSeed, 1));
+  const stars = new THREE.Points(sGeo, new THREE.ShaderMaterial({
+    uniforms: { uTime: U.uTime, uPR: U.uPR }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: /* glsl */`
+      attribute float aSize; attribute float aSeed; uniform float uTime; uniform float uPR; varying float vTw; varying float vSeed;
+      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * uPR; vTw = 0.55 + 0.45 * sin(uTime * (0.6 + aSeed * 1.8) + aSeed * 50.0); vSeed = aSeed; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: /* glsl */`
+      varying float vTw; varying float vSeed;
+      void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = smoothstep(0.5, 0.0, d); vec3 c = mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.85, 0.65), step(0.75, vSeed)); gl_FragColor = vec4(c * vTw, a * vTw * 0.9);
+        #include <colorspace_fragment>
+      }`,
+  }));
+  scene.add(stars);
+
+  /* ================= State + UI wiring ================= */
+  const el = {
+    speed: $('ctl-speed'), temp: $('ctl-temp'), turb: $('ctl-turb'), hue: $('ctl-hue'),
+    outSpeed: $('out-speed'), outTemp: $('out-temp'), outTurb: $('out-turb'), outHue: $('out-hue'),
+    rings: $('tg-rings'), probes: $('tg-probes'), einstein: $('tg-einstein'), corona: $('tg-corona'),
+    hudObj: $('hud-obj'), hudClass: $('hud-class'), hudTeff: $('hud-teff'), hudFps: $('hud-fps'), hudTris: $('hud-tris'),
+    hudCalls: $('hud-calls'), hudDpr: $('hud-dpr'), hudDist: $('hud-dist'), hudMode: $('hud-mode'), hint: $('hud-hint'),
+  };
+  const PRESETS = {
+    sol: { name: 'Sol', cls: 'G2V', temp: 5772, turb: 0.35, speed: 1 },
+    proxima: { name: 'Proxima Cen', cls: 'M5.5Ve', temp: 3042, turb: 0.6, speed: 0.6 },
+    betelgeuse: { name: 'Betelgeuse', cls: 'M1–2 Ia', temp: 3600, turb: 0.95, speed: 0.25 },
+    sirius: { name: 'Sirius A', cls: 'A1V', temp: 9940, turb: 0.18, speed: 1.2 },
+    rigel: { name: 'Rigel', cls: 'B8 Ia', temp: 12100, turb: 0.28, speed: 0.8 },
+    zeta: { name: 'ζ Puppis', cls: 'O4 If', temp: 40000, turb: 0.14, speed: 2.2 },
+  };
+  const T_MIN = 2500, T_SPAN = 16;
+  const vToT = (v) => T_MIN * Math.pow(T_SPAN, v / 1000);
+  const tToV = (t) => (1000 * Math.log(t / T_MIN)) / Math.log(T_SPAN);
+  const fmtK = (t) => Math.round(t).toLocaleString('en-US');
+
+  const state = { temp: 5772, tTemp: 5772, turb: 0.35, tTurb: 0.35, speed: 1, tSpeed: 1, name: 'Sol', cls: 'G2V' };
+
+  // Blackbody track + preset swatches share the same color function as the shader
+  const stops = [];
+  for (let i = 0; i <= 12; i++) stops.push(displayCSS(kelvinRGB(vToT((i / 12) * 1000))) + ' ' + ((i / 12) * 100).toFixed(1) + '%');
+  el.temp.style.setProperty('--track', 'linear-gradient(90deg,' + stops.join(',') + ')');
+  document.querySelectorAll('.preset').forEach((b) => { b.style.setProperty('--c', displayCSS(kelvinRGB(PRESETS[b.dataset.preset].temp))); });
+
+  const setFill = (input) => input.style.setProperty('--fill', (((input.value - input.min) / (input.max - input.min)) * 100).toFixed(1) + '%');
+
+  function applyTemp(t) {
+    const c = kelvinRGB(t);
+    U.uColor.value.setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
+    glow.material.color.copy(U.uColor.value).multiply(U.uColor.value);
+    pulse.material.color.copy(U.uColor.value).lerp(U.uAccent.value, 0.4);
+  }
+  function syncTempUI() {
+    const custom = state.name === 'Custom';
+    const t = custom ? Math.round(state.temp / 10) * 10 : Math.round(state.temp);
+    const label = custom ? spectralClass(t) : state.cls;
+    el.outTemp.textContent = fmtK(t) + ' K · ' + label;
+    el.hudTeff.textContent = fmtK(t) + ' K';
+    el.hudClass.textContent = label;
+    el.hudObj.textContent = state.name;
+    el.temp.value = Math.round(tToV(state.temp));
+  }
+  function syncTurbUI() { el.outTurb.textContent = Math.round(state.turb * 100) + '%'; el.turb.value = state.turb; setFill(el.turb); }
+  function syncSpeedUI() { el.outSpeed.textContent = state.speed.toFixed(2) + '×'; el.speed.value = state.speed; setFill(el.speed); }
+  function setAccent(h) {
+    U.uAccent.value.setHSL(h / 360, 0.85, 0.66, THREE.SRGBColorSpace);
+    lab.style.setProperty('--acc', 'hsl(' + h + ' 85% 66%)');
+    el.outHue.textContent = Math.round(h) + '°';
+    pulse.material.color.copy(U.uColor.value).lerp(U.uAccent.value, 0.4);
+  }
+  function markPreset(key) {
+    document.querySelectorAll('.preset').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.preset === key)));
+  }
+
+  el.speed.addEventListener('input', () => { state.speed = state.tSpeed = +el.speed.value; syncSpeedUI(); });
+  el.turb.addEventListener('input', () => { state.turb = state.tTurb = +el.turb.value; U.uTurb.value = state.turb; syncTurbUI(); });
+  el.temp.addEventListener('input', () => {
+    state.temp = state.tTemp = vToT(+el.temp.value);
+    state.name = 'Custom'; state.cls = '';
+    markPreset(null);
+    applyTemp(state.temp); syncTempUI(); setFill(el.temp);
+  });
+  el.hue.addEventListener('input', () => setAccent(+el.hue.value));
+  document.getElementById('presets').addEventListener('click', (e) => {
+    const b = e.target.closest('.preset'); if (!b) return;
+    const p = PRESETS[b.dataset.preset];
+    state.tTemp = p.temp; state.tTurb = p.turb; state.tSpeed = p.speed;
+    state.name = p.name; state.cls = p.cls;
+    markPreset(b.dataset.preset);
+    syncTempUI();
+    flare(0.55);
+  });
+
+  function setMode(m) {
+    starSolid.visible = m === 'solid'; starWire.visible = m === 'wire'; starPts.visible = m === 'points';
+    glow.material.opacity = m === 'solid' ? 0.45 : 0.2;
+    el.hudMode.textContent = m === 'solid' ? 'surface' : m === 'wire' ? 'wireframe' : 'points';
+  }
+  document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener('change', () => { if (r.checked) setMode(r.value); }));
+  el.rings.addEventListener('change', () => { ringObjs.forEach((o) => { o.torus.visible = el.rings.checked; }); axis.visible = el.rings.checked; });
+  el.probes.addEventListener('change', () => { probeObjs.forEach((p) => { p.visible = el.probes.checked; }); });
+  el.einstein.addEventListener('change', () => { einstein.visible = el.einstein.checked; });
+  el.corona.addEventListener('change', () => { corona.visible = glow.visible = el.corona.checked; });
+
+  /* ---- Flare: click the photosphere, press F, or use the button ---- */
+  let flareT = -1, flareAmp = 1;
+  function flare(amp = 1) {
+    flareT = performance.now() / 1000; flareAmp = amp;
+    pulse.visible = true;
+  }
+  document.getElementById('btn-flare').addEventListener('click', () => flare(1));
+
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const hitSphere = new THREE.Sphere(new THREE.Vector3(), R * 1.08);
+  function overStar(e) {
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    raycaster.setFromCamera(ndc, camera);
+    return raycaster.ray.intersectsSphere(hitSphere);
+  }
+  let down = null, hovering = false;
+  canvas.addEventListener('pointerdown', (e) => {
+    down = { x: e.clientX, y: e.clientY, t: performance.now() };
+    if (e.pointerType === 'mouse') {
+      controls.enableZoom = true;
+      vp.setAttribute('data-lenis-prevent', '');
+      el.hint.textContent = 'Scroll to zoom · drag to orbit';
+    }
+  });
+  canvas.addEventListener('pointerup', (e) => {
+    if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6 && performance.now() - down.t < 450 && overStar(e)) flare(1);
+    down = null;
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse' || !window.__cursorLabel) return;
+    const h = overStar(e);
+    if (h !== hovering) { hovering = h; window.__cursorLabel(h ? 'Flare' : 'Drag'); }
+  }, { passive: true });
+  vp.addEventListener('pointerleave', () => {
+    hovering = false;
+    if (!COARSE) {
+      controls.enableZoom = false;
+      vp.removeAttribute('data-lenis-prevent');
+      el.hint.textContent = 'Click to engage · scroll zooms';
+    }
+  });
+
+  /* ---- Camera helpers: reset, zoom buttons, keyboard ---- */
+  let resetting = false, zoomTo = null;
+  const tmp = new THREE.Vector3();
+  const sph = new THREE.Spherical();
+  controls.addEventListener('start', () => { resetting = false; zoomTo = null; });
+  document.getElementById('btn-reset').addEventListener('click', () => { resetting = true; zoomTo = null; });
+  const zoomBy = (f) => { const d = camera.position.distanceTo(controls.target); zoomTo = THREE.MathUtils.clamp(d * f, controls.minDistance, controls.maxDistance); resetting = false; };
+  document.getElementById('zoom-in').addEventListener('click', () => zoomBy(0.8));
+  document.getElementById('zoom-out').addEventListener('click', () => zoomBy(1.25));
+  vp.addEventListener('keydown', (e) => {
+    if (e.target !== vp) return;
+    const k = e.key;
+    if (k === 'f' || k === 'F' || k === 'Enter' || k === ' ') { e.preventDefault(); flare(1); return; }
+    if (k === 'r' || k === 'R') { e.preventDefault(); resetting = true; return; }
+    if (k === '+' || k === '=') { e.preventDefault(); zoomBy(0.85); return; }
+    if (k === '-' || k === '_') { e.preventDefault(); zoomBy(1.18); return; }
+    if (!k.startsWith('Arrow')) return;
+    e.preventDefault();
+    resetting = false;
+    tmp.copy(camera.position).sub(controls.target);
+    sph.setFromVector3(tmp);
+    if (k === 'ArrowLeft') sph.theta -= 0.14;
+    if (k === 'ArrowRight') sph.theta += 0.14;
+    if (k === 'ArrowUp') sph.phi = Math.max(0.2, sph.phi - 0.12);
+    if (k === 'ArrowDown') sph.phi = Math.min(Math.PI - 0.2, sph.phi + 0.12);
+    tmp.setFromSpherical(sph);
+    camera.position.copy(controls.target).add(tmp);
+  });
+
+  /* ---- Resize ---- */
+  function resize() {
+    const w = vp.clientWidth, h = vp.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.fov = camera.aspect < 1.2 ? Math.min(62, 38 * Math.pow(1.2 / camera.aspect, 0.9)) : 38;
+    camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(vp);
+  resize();
+
+  /* ---- Init UI state ---- */
+  setAccent(+el.hue.value);
+  applyTemp(state.temp);
+  syncTempUI(); syncTurbUI(); syncSpeedUI(); setFill(el.temp); setFill(el.hue);
+  el.hudDpr.textContent = pr.toFixed(2);
+
+  /* ---- Frame ---- */
+  let simT = 0, fpsFrames = 0, fpsT0 = performance.now(), lastMs = performance.now(), lowWindows = 0;
+  visibleLoop(vp, (dt) => {
+    const ts = REDUCE ? 0.35 : 1;
+    U.uTime.value += dt * ts;
+    const k = 1 - Math.pow(0.02, dt);
+
+    if (Math.abs(state.tTemp - state.temp) > 0.5) { state.temp += (state.tTemp - state.temp) * k; applyTemp(state.temp); syncTempUI(); setFill(el.temp); }
+    if (Math.abs(state.tTurb - state.turb) > 0.001) { state.turb += (state.tTurb - state.turb) * k; U.uTurb.value = state.turb; syncTurbUI(); }
+    if (Math.abs(state.tSpeed - state.speed) > 0.001) { state.speed += (state.tSpeed - state.speed) * k; syncSpeedUI(); }
+
+    simT += dt * state.speed * ts;
+    U.uSim.value = simT;
+    starGroup.rotation.y = simT * 0.18;
+    corona.rotation.y = simT * 0.05;
+    ringObjs.forEach((o, i) => { o.group.rotation.y = o.node + simT * 0.012 * (i + 1); });
+
+    if (flareT >= 0) {
+      const e = (performance.now() / 1000 - flareT) / 1.7;
+      if (e >= 1) { flareT = -1; U.uFlare.value = 0; pulse.visible = false; }
+      else {
+        U.uFlare.value = Math.pow(1 - e, 2.2) * flareAmp;
+        pulse.scale.setScalar(1 + e * 2.8);
+        pulse.material.opacity = Math.pow(1 - e, 2) * 0.85 * flareAmp;
+      }
+    }
+
+    if (resetting) {
+      camera.position.lerp(HOME, 1 - Math.pow(0.004, dt));
+      if (camera.position.distanceTo(HOME) < 0.01) resetting = false;
+    }
+    if (zoomTo !== null) {
+      tmp.copy(camera.position).sub(controls.target);
+      const d = tmp.length();
+      const nd = d + (zoomTo - d) * (1 - Math.pow(0.002, dt));
+      tmp.setLength(nd);
+      camera.position.copy(controls.target).add(tmp);
+      if (Math.abs(nd - zoomTo) < 0.01) zoomTo = null;
+    }
+
+    controls.update();
+    einstein.quaternion.copy(camera.quaternion);
+    renderer.render(scene, camera);
+
+    // HUD + adaptive resolution (2×/s, measured in wall-clock time)
+    const nowMs = performance.now();
+    if (nowMs - lastMs > 1000) { fpsT0 = nowMs; fpsFrames = 0; }
+    lastMs = nowMs;
+    fpsFrames++;
+    if (nowMs - fpsT0 >= 500) {
+      const fps = (fpsFrames * 1000) / (nowMs - fpsT0);
+      el.hudFps.textContent = Math.round(fps);
+      el.hudTris.textContent = (renderer.info.render.triangles / 1000).toFixed(1) + 'k';
+      el.hudCalls.textContent = renderer.info.render.calls;
+      el.hudDist.textContent = (camera.position.distanceTo(controls.target) / R).toFixed(1);
+      lowWindows = fps < 38 ? lowWindows + 1 : 0;
+      if (lowWindows >= 2 && pr > 1) {
+        lowWindows = 0;
+        pr = Math.max(1, pr - 0.25);
+        renderer.setPixelRatio(pr); U.uPR.value = pr; resize();
+        el.hudDpr.textContent = pr.toFixed(2);
+      }
+      fpsFrames = 0; fpsT0 = nowMs;
+    }
+  });
+}
+</script>
+</body>
+</html>
