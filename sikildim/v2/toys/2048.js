@@ -32,9 +32,18 @@ registerToy('2048', {
 .tile:hover .art-2048 i:nth-child(1) { transform: translateX(58px); opacity: 0; }
 .tile:hover .art-2048 i:nth-child(2) { transform: scale(1.08); }
 
-.g2048 { --bsize: min(480px, calc(100vw - 32px)); --g-acc: var(--cobalt); gap: clamp(12px, 1.8vw, 20px); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .g2048 { --g-acc: var(--sky); } }
-:root[data-theme="dark"] .g2048 { --g-acc: var(--sky); }
+.g2048 { --bsize: min(480px, calc(100vw - 32px)); --g-acc: var(--cobalt); --g-cell: var(--panel-3); gap: clamp(12px, 1.8vw, 20px); touch-action: manipulation; }
+/* Dark: the shared ramp's 2 and 4 are darker than the empty cells. Sink the cells and lift the first two tiles. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .g2048 {
+    --g-acc: var(--sky); --g-cell: var(--bg);
+    --g2: color-mix(in srgb, var(--fg) 15%, var(--panel-2)); --g4: color-mix(in srgb, var(--g8) 26%, var(--panel-2));
+  }
+}
+:root[data-theme="dark"] .g2048 {
+  --g-acc: var(--sky); --g-cell: var(--bg);
+  --g2: color-mix(in srgb, var(--fg) 15%, var(--panel-2)); --g4: color-mix(in srgb, var(--g8) 26%, var(--panel-2));
+}
 .g2048 .g-head, .g2048 .g-bar { width: var(--bsize); max-width: 100%; }
 
 .g2048 .g-head { display: flex; align-items: stretch; gap: 8px; }
@@ -75,7 +84,7 @@ registerToy('2048', {
 .g2048 .g-board:focus-visible { outline: 2.5px solid var(--fg); outline-offset: 4px; }
 .g2048 .g-cells, .g2048 .g-tiles { position: absolute; inset: var(--gap); }
 .g2048 .g-cells { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap); }
-.g2048 .g-cells i { border-radius: var(--rad); background: var(--panel-3); opacity: .55; }
+.g2048 .g-cells i { border-radius: var(--rad); background: var(--g-cell); opacity: .55; }
 .g2048 .t {
   position: absolute; left: 0; top: 0; width: calc((100% - 3 * var(--gap)) / 4); aspect-ratio: 1; z-index: 1;
   transform: translate(calc(var(--x) * (100% + var(--gap))), calc(var(--y) * (100% + var(--gap))));
@@ -109,25 +118,32 @@ registerToy('2048', {
 .g2048 .t[data-v="2048"] { --tb: var(--ink-tile); --tf: var(--ink-tile-fg); }
 .g2048 .t[data-v="sup"] { --tb: var(--gsup); --tf: var(--on-light); }
 
+.g2048 .g-board { container-type: inline-size; }
 .g2048 .g-over {
-  position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; justify-items: center; gap: 10px; padding: 18px;
+  position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; justify-items: center; gap: clamp(6px, calc(var(--bsize) * .024), 10px); padding: 12px;
   border-radius: inherit; text-align: center; background: color-mix(in srgb, var(--bg) 82%, transparent);
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: fadein .35s var(--ease);
 }
-.g2048 .g-over-title { font-size: clamp(32px, calc(var(--bsize) * .12), 56px); font-weight: 800; line-height: 1; letter-spacing: -.045em; }
-.g2048 .g-over-score { font-size: clamp(17px, calc(var(--bsize) * .05), 22px); font-weight: 650; letter-spacing: -.02em; }
+.g2048 .g-over-title { font-size: clamp(24px, calc(var(--bsize) * .095), 52px); font-weight: 800; line-height: 1; letter-spacing: -.045em; white-space: nowrap; }
+.g2048 .g-over-score { font-size: clamp(15px, calc(var(--bsize) * .05), 22px); font-weight: 650; letter-spacing: -.02em; }
 .g2048 .g-over-score em { font-style: normal; color: var(--g-acc); }
 .g2048 .g-over .mono { color: var(--mute); }
-.g2048 .g-over-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
-.g2048 .g-over-actions .btn { gap: 8px; padding: 0 18px; }
+.g2048 .g-over-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
+.g2048 .g-over-actions .btn { height: 46px; gap: 8px; padding: 0 18px; }
 .g2048 .g-over-actions svg { width: 18px; height: 18px; flex: none; }
+/* Small boards (320 px phones, landscape): compact buttons, icon-only share, so the panel stays inside the board. */
+@container (max-width: 340px) {
+  .g2048 .g-over-actions .btn { height: 44px; padding: 0 14px; font-size: 15px; }
+  .g2048 .g-over-actions [data-act="undo"] svg { display: none; }
+  .g2048 .g-over-actions [data-act="share"] { width: 44px; padding: 0; }
+  .g2048 .g-over-actions [data-act="share"] span { display: none; }
+}
 .g2048 .g-status { color: var(--mute); text-align: center; text-wrap: balance; }
 
 @media (max-width: 380px) {
   .g2048 .g-bar .btn { padding: 0 13px; font-size: 15px; }
   .g2048 .g-undo svg { display: none; }
   .g2048 .g-card { padding: 9px 11px; }
-  .g2048 .g-over-actions .btn { padding: 0 14px; font-size: 15px; }
 }
 
 /* Landscape phones: the board takes the height, score and controls move to a side column. */
@@ -172,7 +188,7 @@ registerToy('2048', {
     const fine = matchMedia('(pointer: fine)').matches;
 
     let grid = [], score = 0, best = store.get('g-best', 0), won = false, nextId = 1, pending = null, alive = true;
-    let moves = 0, undos = UNDOS, past = [], bestAtStart = 0, wasHot = false, overKind = null;
+    let moves = 0, undos = UNDOS, past = [], bestAtStart = 0, wasHot = false, overKind = null, viaKeys = false;
     if (!okNum(best)) best = 0;
     const tiles = new Map();
 
@@ -242,16 +258,16 @@ registerToy('2048', {
       overEl.hidden = false;
       const top = maxTile(), mv = moves == null ? '' : `${fmt(moves)} hamle · `;
       const canUndo = undos > 0 && past.length > 0;
-      const shareB = `<button type="button" class="btn" data-act="share">${SHARE_SVG}Paylaş</button>`;
+      const shareB = `<button type="button" class="btn" data-act="share" aria-label="Paylaş">${SHARE_SVG}<span>Paylaş</span></button>`;
       overEl.innerHTML = kind === 'win'
         ? `<p class="g-over-title">2048!</p>
            <p class="mono">${mv}Başardın. İstersen devam et.</p>
            <div class="g-over-actions"><button type="button" class="btn primary" data-act="keep">Devam et</button>${shareB}<button type="button" class="btn" data-act="new">Yeni oyun</button></div>`
         : `<p class="g-over-title">Hamle kalmadı</p>
-           <p class="g-over-score">${fmt(score)} puan${score >= best && score > 0 ? ' · <em>yeni rekor</em>' : ''}</p>
+           <p class="g-over-score">${fmt(score)} puan${score > 0 && score >= best && score > bestAtStart ? ' · <em>yeni rekor</em>' : ''}</p>
            <p class="mono">${mv}en büyük taş ${fmt(top)}</p>
            <div class="g-over-actions"><button type="button" class="btn primary" data-act="new">Yeni oyun</button>${canUndo ? `<button type="button" class="btn" data-act="undo">${UNDO_SVG}Geri al (${undos})</button>` : ''}${shareB}</div>`;
-      const b = overEl.querySelector('.btn.primary'); if (b) b.focus({ preventScroll: true });
+      const b = overEl.querySelector('.btn.primary'); if (b && viaKeys) b.focus({ preventScroll: true });   // touch players get no stray focus ring
       say(kind === 'win' ? '2048 yaptın!' : `Hamle kalmadı. Skor ${score}.${canUndo ? ` ${undos} geri alma hakkın var.` : ''}`);
     }
     function hideOver() { overEl.hidden = true; overEl.innerHTML = ''; overKind = null; }
@@ -261,11 +277,11 @@ registerToy('2048', {
     }
 
     /* ---------- game flow ---------- */
-    function reset() {
+    function reset(focus = true) {
       flush(); clearBoard(); hideOver();
       score = 0; won = false; moves = 0; undos = UNDOS; past = []; bestAtStart = best; wasHot = false;
       spawn(); spawn(); renderScore(); renderBar(); save();
-      if (fine) board.focus({ preventScroll: true });
+      if (focus && fine) board.focus({ preventScroll: true });     // keeps Space/Enter from pressing "Yeni oyun" again
     }
     function flush() { if (pending) { clearTimeout(pending.timer); const p = pending; pending = null; p.run(); } }
     function nudge(dir) {
@@ -312,7 +328,7 @@ registerToy('2048', {
       const run = () => {
         dying.forEach(t => t.el.remove());
         grown.forEach(o => { paint(o); o.el.classList.remove('merged', 'new', 'back'); void o.el.offsetWidth; o.el.classList.add('merged'); });
-        spawn(); save(); check();
+        spawn(); save(); if (alive) check();
       };
       pending = { run, timer: setTimeout(() => { const p = pending; pending = null; if (p) p.run(); }, motionOK() ? 115 : 0) };
     }
@@ -384,12 +400,12 @@ registerToy('2048', {
       bestAtStart = score >= best ? 0 : best;                            // already the record holder: no "new record" flash on resume
       renderScore(); renderBar();
       if (!canMove()) showOver('lose');
-    } else reset();
+    } else reset(false);
     renderScore(); renderBar();
     layout();
 
     /* ---------- input ---------- */
-    $('#g-new', el).addEventListener('click', reset);
+    $('#g-new', el).addEventListener('click', () => reset());
     undoBtn.addEventListener('click', undo);
     shareBtn.addEventListener('click', share);
     overEl.addEventListener('click', e => {
@@ -401,7 +417,7 @@ registerToy('2048', {
       else { hideOver(); if (fine) board.focus({ preventScroll: true }); }
     });
     let sw = null;
-    board.addEventListener('pointerdown', e => { if (!overEl.hidden || (e.pointerType === 'mouse' && e.button !== 0)) return; sw = { x: e.clientX, y: e.clientY, id: e.pointerId }; });
+    board.addEventListener('pointerdown', e => { viaKeys = false; if (!overEl.hidden || (e.pointerType === 'mouse' && e.button !== 0)) return; sw = { x: e.clientX, y: e.clientY, id: e.pointerId }; });
     board.addEventListener('pointerup', e => {
       if (!sw || sw.id !== e.pointerId) return;
       const dx = e.clientX - sw.x, dy = e.clientY - sw.y; sw = null;
@@ -413,19 +429,18 @@ registerToy('2048', {
     const onResize = () => layout();
     window.addEventListener('resize', onResize);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => layout());
-    const focusT = setTimeout(() => { if (fine && overEl.hidden) board.focus({ preventScroll: true }); }, 50);
 
     const KEYS = { ArrowLeft: 'L', ArrowRight: 'R', ArrowUp: 'U', ArrowDown: 'D', a: 'L', d: 'R', w: 'U', s: 'D' };
     return {
       onKey(e) {
         if (isField(e.target)) return;
         const k = e.key.length === 1 ? e.key.toLocaleLowerCase('tr') : e.key;
-        if (KEYS[k]) { e.preventDefault(); move(KEYS[k]); }
+        if (KEYS[k]) { e.preventDefault(); viaKeys = true; move(KEYS[k]); }
         else if (k === 'n' && !e.repeat) { e.preventDefault(); reset(); }
         else if (k === 'u' && !e.repeat) { e.preventDefault(); undo(); }
       },
       destroy() {
-        alive = false; flush(); clearTimeout(focusT);
+        alive = false; flush();
         window.removeEventListener('resize', onResize);
       },
     };

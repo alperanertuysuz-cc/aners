@@ -67,7 +67,7 @@ registerToy('hafiza', {
   24.5%, 100% { background: rgba(22, 23, 26, .2); transform: none; box-shadow: 0 4px 0 rgba(22, 23, 26, .2), 0 0 0 4px rgba(255, 253, 248, 0); }
 }
 
-.hafiza-root { --bs: 320px; gap: clamp(12px, 2.1vh, 20px); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.hafiza-root { --bs: 320px; gap: clamp(12px, 2.1vh, 20px); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .hafiza-root .hf-w { width: var(--bs); min-width: min(100%, 288px); max-width: 100%; }
 
 .hafiza-root .hf-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -78,7 +78,7 @@ registerToy('hafiza', {
 .hafiza-root .hf-best b { font-size: 22px; padding-bottom: 5px; background: linear-gradient(var(--c), var(--c)) 0 100% / 0 3.5px no-repeat; transition: background-size .5s var(--ease); }
 .hafiza-root .hf-best.hot b { background-size: 100% 3.5px; }
 .hafiza-root .hf-lvl { flex-wrap: nowrap; transition: opacity .25s; }
-.hafiza-root .hf-lvl button { min-height: 40px; }
+.hafiza-root .hf-lvl button { min-height: 44px; }
 .hafiza-root .hf-lvl.locked { opacity: .45; }
 .hafiza-root .hf-lvl button:disabled { cursor: default; }
 
@@ -197,7 +197,7 @@ registerToy('hafiza', {
   .hafiza-root .hf-foot { grid-area: foot; align-self: start; }
 }
 `,
-  hint: '1–4 kareler · Zor’da 1–9 · Boşluk başlat',
+  hint: 'Kareler 1–4 · Zor’da 1–9 · Boşluk başlat',
   mount(el) {
     const data = readData();
     const best = data.best;
@@ -407,7 +407,7 @@ registerToy('hafiza', {
       later(showOver, 1900);
     }
     function showOver() {
-      setMode('over'); msg('Bir tur daha?', L.note);
+      setMode('over'); msg('Bir tur daha?', L.note); segs(0);
       const score = Math.max(0, seq.length - 1), zor = lvl === 'zor';
       const rec = score > 0 && score > startBest && score >= best[lvl], first = rec && startBest === 0;
       plays++; save();
@@ -416,7 +416,7 @@ registerToy('hafiza', {
           ${rec ? `<p class="mono hf-rec">${first ? 'İlk rekorun' : 'Yeni rekor'}</p>` : '<p class="mono hf-o-k">Oyun bitti</p>'}
           <p class="hf-o-big">${fmt(score)}</p>
           <p class="hf-o-sub">${score ? 'adımlık diziyi hatırladın' : 'İlk adımda kaçtı'}</p>
-          <p class="mono hf-o-meta">${rating(score, zor)} · Rekor ${fmt(best[lvl])}${zor ? ' · Zor' : ''}</p>
+          <p class="mono hf-o-meta">${rating(score, zor)}${best[lvl] ? ` · Rekor ${fmt(best[lvl])}` : ''}${zor ? ' · Zor' : ''}</p>
           <div class="hf-o-actions">
             <button type="button" class="btn primary" data-act="again">Tekrar <kbd>Boşluk</kbd></button>
             ${score ? `<button type="button" class="btn" data-act="share">${SHARE_SVG}Paylaş</button>` : ''}
@@ -424,7 +424,7 @@ registerToy('hafiza', {
         </div>`;
       overEl.classList.remove('armed'); overEl.hidden = false;
       if (rec && !first) Sound.chime();
-      say(`Oyun bitti. ${score} adım. ${rec ? 'Yeni rekor.' : `Rekor ${best[lvl]}.`}`);
+      say(`Oyun bitti. ${score} adım. ${rec ? 'Yeni rekor.' : best[lvl] ? `Rekor ${best[lvl]}.` : ''}`);
       later(() => {
         overEl.classList.add('armed');
         const b = $('[data-act="again"]', overEl); if (b) b.focus({ preventScroll: true });

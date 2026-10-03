@@ -1,7 +1,7 @@
 /* Sıkıldım service worker — generated; do not edit by hand.
    Precaches the whole app so it opens offline. VERSION changes whenever any shipped file changes,
    which makes the page show "Yeni sürüm hazır". */
-const VERSION = 'a4e26a4e1dfe';
+const VERSION = '6a591d404303';
 const CACHE = 'sikildim-v2-' + VERSION;
 const FONT_CACHE = 'sikildim-fonts';
 const PRECACHE = [
@@ -17,13 +17,19 @@ const PRECACHE = [
   "./index.html",
   "./manifest.webmanifest",
   "./toys/2048.js",
+  "./toys/duello.js",
+  "./toys/hafiza.js",
   "./toys/kaleydoskop.js",
+  "./toys/kelime-words.js",
+  "./toys/kelime.js",
+  "./toys/melodi.js",
   "./toys/nefes.js",
   "./toys/patlat.js",
   "./toys/refleks.js",
   "./toys/ritim.js",
   "./toys/yapsam.js",
-  "./toys/yaz.js"
+  "./toys/yaz.js",
+  "./toys/yilan.js"
 ];
 
 self.addEventListener('install', e => {

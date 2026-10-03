@@ -29,15 +29,28 @@ registerToy('nefes', {
 .art-nefes i { width: 64%; aspect-ratio: 1; border-radius: 50%; background: var(--paper); animation: nf-art 8s cubic-bezier(.45, 0, .55, 1) infinite; }
 @keyframes nf-art { 0%, 100% { transform: scale(.6); } 50% { transform: scale(1); } }
 
+.nefes-root { touch-action: manipulation; }
 .nefes-root .nf-controls { display: grid; justify-items: center; gap: 10px; }
 .nefes-root .nf-modes button { white-space: nowrap; }
 .nefes-root .seg-sub { margin-left: 6px; font: 500 11px var(--f-mono); opacity: .6; }
 .nefes-root .nf-lens { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .nefes-root .nf-lens .chip { height: 40px; padding: 0 15px; }
-.nefes-root .nf-breath { position: relative; display: grid; place-items: center; width: min(380px, 78vw, max(208px, calc(100vh - 410px))); aspect-ratio: 1; container-type: inline-size; }
+/* Phone fingers: 44px tall hit areas around the smaller pills, without growing them. */
+.nefes-root .seg button, .nefes-root .chip { position: relative; }
+@media (pointer: coarse) {
+  .nefes-root .seg button::after { content: ""; position: absolute; inset: -4px -1.5px; }
+  .nefes-root .nf-lens .chip::after { content: ""; position: absolute; inset: -2px -3px; border-radius: 999px; }
+}
+/* svh: the visible height with the browser bars shown, so the circle never pushes the button off a phone screen. */
+.nefes-root .nf-breath {
+  position: relative; display: grid; place-items: center; aspect-ratio: 1; container-type: inline-size;
+  width: min(380px, 78vw, max(208px, calc(100vh - 410px))); width: min(380px, 78vw, max(208px, calc(100svh - 410px)));
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
 .nefes-root .nf-breath svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
 .nefes-root .nf-ring-bg { fill: none; stroke: var(--line-2); stroke-width: 1.2; }
 .nefes-root .nf-ring { fill: none; stroke: var(--fg); stroke-width: 2.2; stroke-linecap: round; }
+.nefes-root:not(.run):not(.done) .nf-ring { opacity: 0; }   /* at rest the empty arc would leave a lone round-cap dot at 12 o'clock */
 .nefes-root .nf-sess-bg { fill: none; stroke: var(--line); stroke-width: 1; opacity: 0; transition: opacity .6s; }
 .nefes-root .nf-sess { fill: none; stroke: color-mix(in srgb, var(--mint) 55%, var(--green)); stroke-width: 1.6; stroke-linecap: round; opacity: 0; transition: opacity .6s; }
 .nefes-root.timed .nf-sess-bg, .nefes-root.live .nf-sess { opacity: 1; }
@@ -57,6 +70,17 @@ registerToy('nefes', {
   .nefes-root .seg-sub { display: none; }
   .nefes-root .nf-lens .chip { padding: 0 12px; }
 }
+/* A phone on its side: the circle on the left, controls, button and time on the right; nothing scrolls. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .nefes-root {
+    display: grid; grid-template-columns: auto auto; grid-template-rows: 1fr auto auto auto 1fr;
+    justify-content: center; align-items: center; gap: 12px clamp(24px, 5vw, 56px);
+  }
+  .nefes-root .nf-breath { grid-column: 1; grid-row: 1 / -1; width: clamp(170px, calc(100vh - 136px), 300px); width: clamp(170px, calc(100svh - 136px), 300px); }
+  .nefes-root .nf-controls { grid-column: 2; grid-row: 2; }
+  .nefes-root #nf-go { grid-column: 2; grid-row: 3; justify-self: center; }
+  .nefes-root .nf-meta { grid-column: 2; grid-row: 4; justify-self: center; }
+}
 `,
   hint: 'Boşluk başlat / durdur · 1–4 süre',
   mount(el) {
@@ -64,7 +88,7 @@ registerToy('nefes', {
     if (!BREATHS[mode]) mode = 'kutu';
     let len = store.get(K_LEN, 0);
     if (!LENS.some(([v]) => v === len)) len = 0;
-    let running = false, si = 0, timers = [], cycles = 0, t0 = 0, clock = 0, tone = null, wake = null, kEnd = -1;
+    let running = false, si = 0, timers = [], cycles = 0, t0 = 0, clock = 0, tone = null, wake = null, kEnd = -1, tabbed = false;
     el.innerHTML = `
       <div class="toy nefes-root">
         <div class="nf-controls">
@@ -98,8 +122,8 @@ registerToy('nefes', {
       if (rootEl.classList.contains('done')) return;
       if (running && timed()) {
         const left = Math.max(0, Math.ceil(plannedSec(mode, kEnd) - elapsed()));
-        metaEl.textContent = `Tur ${cycles} / ${kEnd + 1} · ${clockTxt(left)} kaldı`;
-      } else if (running) metaEl.textContent = `Tur ${cycles} · ${clockTxt(Math.floor(elapsed()))}`;
+        metaEl.textContent = `Tur ${Math.min(cycles + 1, kEnd + 1)} / ${kEnd + 1} · ${clockTxt(left)} kaldı`;
+      } else if (running) metaEl.textContent = `Tur ${cycles + 1} · ${clockTxt(Math.floor(elapsed()))}`;
       else if (len) { const k = planK(mode, len); metaEl.textContent = `${k + 1} tur · ${clockTxt(plannedSec(mode, k))}`; }
       else metaEl.textContent = 'Tur 0 · 00:00';
     }
@@ -123,6 +147,7 @@ registerToy('nefes', {
       if (kEnd === cycles && si > outIdx(mode)) kEnd = cycles + 1;
     }
     function phase() {
+      timers = [];   // every timer of the previous phase has fired by now
       const steps = BREATHS[mode].steps, [label, sec, kind] = steps[si];
       phaseEl.textContent = label; countEl.textContent = sec;
       important(orb, 'transition', `transform ${sec}s cubic-bezier(.45,0,.55,1)`);
@@ -151,6 +176,7 @@ registerToy('nefes', {
     function begin() {
       clearDone();
       running = true; si = 0; cycles = 0; t0 = performance.now();
+      rootEl.classList.add('run'); countEl.setAttribute('aria-hidden', 'true');   // the label announces phases, not every second
       plan(); setGo('Durdur');
       clock = setInterval(renderMeta, 1000); renderMeta(); syncSession(); phase();
       lock();
@@ -158,6 +184,7 @@ registerToy('nefes', {
     function halt() {
       if (running) store.set('nf-total', store.get('nf-total', 0) + Math.round(elapsed()));
       running = false; timers.forEach(clearTimeout); timers = []; clearInterval(clock);
+      rootEl.classList.remove('run'); countEl.removeAttribute('aria-hidden');
       if (tone) { tone.stop(); tone = null; }
       unlock();
     }
@@ -166,7 +193,7 @@ registerToy('nefes', {
       clearDone();
       if (!running) kEnd = planK(mode, len);
       important(orb, 'transition', 'transform .9s cubic-bezier(.45,0,.55,1)'); orb.style.transform = 'scale(.55)';
-      important(ring, 'transition', 'stroke-dashoffset .6s ease'); ring.style.strokeDashoffset = 100;
+      important(ring, 'transition', 'stroke-dashoffset .6s ease, opacity .25s ease .45s'); ring.style.strokeDashoffset = 100;
       setGo('Başla'); idleCopy(); syncSession(); renderMeta();
     }
     function end() { halt(); reset(); }
@@ -211,14 +238,21 @@ registerToy('nefes', {
     });
     const onVis = () => { if (document.visibilityState === 'visible' && running) lock(); };
     document.addEventListener('visibilitychange', onVis);
+    /* A mouse click must not leave focus on a control, so Space keeps starting and stopping afterwards. */
+    el.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+    const onPointer = () => { tabbed = false; };
+    document.addEventListener('pointerdown', onPointer, true);
     reset();
     return {
       onKey(e) {
         if (isField(e.target)) return;
+        if (e.key === 'Tab') { tabbed = true; return; }
+        const ctl = e.target && e.target.closest ? e.target.closest('button, a[href]') : null;
+        if (ctl && (e.key === ' ' || e.key === 'Enter') && (tabbed || el.contains(ctl))) return;   // a control reached with Tab gets its own Space / Enter
         if (e.key === ' ') { e.preventDefault(); if (!e.repeat) (running ? end() : begin()); }
         else if (/^[1-4]$/.test(e.key) && !e.repeat) { const b = $(`[data-len="${LENS[+e.key - 1][0]}"]`, el); if (b) pickLen(b); }
       },
-      destroy() { halt(); document.removeEventListener('visibilitychange', onVis); },
+      destroy() { halt(); document.removeEventListener('visibilitychange', onVis); document.removeEventListener('pointerdown', onPointer, true); },
     };
   },
 });

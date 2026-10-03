@@ -10,7 +10,7 @@ const MODE_IDS = ['refleks', 'yaris', 'xox'];
 const MODES = {
   refleks: { name: 'Refleks', meta: '5 puan', desc: 'Yeşil yanınca ilk basan kazanır. Erken basan puanı rakibe kaptırır.' },
   yaris: { name: 'Parmak yarışı', meta: '5 saniye', desc: 'Beş saniye durmadan dokun. Daha çok dokunan kazanır.' },
-  xox: { name: 'XOX', meta: '3 el', desc: 'Sırayla X ve O koyun. Üçünü yan yana dizen eli alır.' },
+  xox: { name: 'XOX', meta: '3 el', desc: 'Sırayla X ve O koyun. Üçünü bir çizgiye dizen eli alır.' },
 };
 const RF_TARGET = 5, XOX_TARGET = 3, RACE_MS = 5000;
 const LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
@@ -56,7 +56,7 @@ registerToy('duello', {
   stat: () => {
     const s = readStats();
     if (!s.last) return '3 mod · aynı telefon';
-    return s.last.w < 0 ? 'Son maç: berabere' : `Son maç: ${NAMES[s.last.w]}`;
+    return s.last.w < 0 ? 'Berabere bitti' : `${NAMES[s.last.w]} kazandı`;   // last match; short enough for one line on a 320px tile
   },
   css: `
 .art-duello { position: relative; width: 112px; height: 112px; rotate: -9deg; transition: rotate .6s var(--spring); }
@@ -85,7 +85,7 @@ registerToy('duello', {
   --p1: var(--red); --p1i: var(--on-light);
   --go: var(--green);
 }
-.duello-root.toy { flex: 1 1 auto; align-self: stretch; margin: 0 auto; min-height: 0; gap: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.duello-root.toy { flex: 1 1 auto; align-self: stretch; margin: 0 auto; min-height: 0; gap: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .duello-root[data-screen="play"] { touch-action: none; }
 
 /* ---------- Mode picker ---------- */
@@ -232,7 +232,7 @@ registerToy('duello', {
 .duello-root .du-actions { display: none; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .duello-root .du-arena[data-phase="end"] .du-actions { display: flex; visibility: hidden; opacity: 0; transform: translateY(8px); }
 .duello-root .du-arena[data-phase="end"][data-armed] .du-actions { visibility: visible; opacity: 1; transform: none; transition: opacity .35s var(--ease), transform .5s var(--spring); }
-.duello-root .du-actions .btn { height: clamp(42px, 14cqmin, 52px); padding: 0 clamp(16px, 5.4cqmin, 24px); color: var(--fg); }
+.duello-root .du-actions .btn { height: clamp(44px, 14cqmin, 52px); padding: 0 clamp(16px, 5.4cqmin, 24px); color: var(--fg); }
 .duello-root .du-actions .btn.primary { color: var(--bg); }
 @container dupad (max-height: 175px) {
   .duello-root .du-body { flex-direction: row; gap: 12px; }
@@ -246,7 +246,7 @@ registerToy('duello', {
 
 .duello-root .du-mid { flex: none; display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 8px; }
 .duello-root .du-menu {
-  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; color: var(--fg);
+  display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 50%; color: var(--fg);
   background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); transition: transform .3s var(--spring), opacity .25s, background .2s;
 }
 .duello-root .du-menu:hover { background: var(--panel-2); }
@@ -567,7 +567,9 @@ registerToy('duello', {
     function rfHit(p, e) {
       if (phase === 'wait') { if (performance.now() >= armAt) rfEarly(p); return; }
       if (phase !== 'go') return;
-      const ms = clamp(Math.round(stamp(e) - t0), 0, 9999), o = 1 - p;
+      const at = stamp(e);
+      if (at < t0) { rfEarly(p); return; }            // pressed before the light went on, the event just arrived late
+      const ms = Math.min(9999, Math.round(at - t0)), o = 1 - p;
       stop(); setPhase('point'); score[p]++;
       if (fastest[p] == null || ms < fastest[p]) fastest[p] = ms;
       const rec = !stats.bestMs || ms < stats.bestMs;

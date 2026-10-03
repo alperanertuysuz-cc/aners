@@ -11,7 +11,7 @@ const allowedSet = () => ALLOWED || (ALLOWED = new Set(WORDS.allowed || []));
 
 const LEN = 5, ROWS = 6;
 const EPOCH = Date.UTC(2026, 9, 3); // #1
-const SEED = 20261511; // chosen so that #1 (launch day) is “kahve”
+const SEED = 20263777; // chosen so that #1 (launch day) is “kahve” (re-picked after “kaşar” left the answers)
 const ALPHA = new Set('abcçdefgğhıijklmnoöprsştuüvyz');
 const KEY_ROWS = [
   ['e', 'r', 't', 'y', 'u', 'ı', 'o', 'p', 'ğ', 'ü'],
@@ -42,7 +42,7 @@ function dailyAnswer(n) {
 }
 let partsFmt = null, dateFmt = null;
 try { partsFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Istanbul', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle: 'h23' }); } catch (e) {}
-try { dateFmt = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long' }); } catch (e) {}
+try { dateFmt = new Intl.DateTimeFormat('tr-TR', { timeZone: 'UTC', day: 'numeric', month: 'long' }); } catch (e) {}
 function trNow(date = new Date()) {
   if (partsFmt) {
     try {
@@ -55,7 +55,7 @@ function trNow(date = new Date()) {
 }
 const dayNum = (p = trNow()) => Math.round((Date.UTC(p.y, p.m - 1, p.d) - EPOCH) / 864e5) + 1;
 const secsToNext = (p = trNow()) => 86400 - (p.h * 3600 + p.mi * 60 + p.s);
-const dateLabel = () => { try { return dateFmt ? dateFmt.format(new Date()) : ''; } catch (e) { return ''; } };
+const dateLabel = day => { try { return dateFmt ? dateFmt.format(new Date(EPOCH + (day - 1) * 864e5)) : ''; } catch (e) { return ''; } }; // the puzzle's own date, not today's
 const fmtCount = () => { const t = Math.max(0, secsToNext()); return [Math.floor(t / 3600), Math.floor(t / 60) % 60, t % 60].map(v => String(v).padStart(2, '0')).join(':'); };
 
 /* ---------- Scoring + storage ---------- */
@@ -98,7 +98,7 @@ registerToy('kelime', {
   stat: () => {
     const today = dayNum(), k = liveStreak(loadStats(K_STATS), today), st = store.get(K_DAILY, null);
     if (k > 0) return `Seri ${k} gün`;
-    return st && st.day === today && st.done ? 'Bugünkü bitti' : 'Günün kelimesi hazır';
+    return st && st.day === today && st.done ? 'Yarın yeni kelime' : 'Günün kelimesi hazır';
   },
   css: `
 .art-kelime { display: grid; gap: 5px; }
@@ -121,9 +121,10 @@ registerToy('kelime', {
 .tile:hover .art-kelime i.e::after { content: attr(data-l); }
 .tile:hover .art-kelime i.e::before { display: none; }
 
-.kl-root.toy { flex: 1 0 auto; max-width: 620px; margin: -8px auto -14px; gap: var(--kl-gap, 12px); justify-content: space-between; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.kl-root.toy { flex: 1 0 auto; max-width: 620px; margin: -8px auto -14px; gap: var(--kl-gap, 12px); justify-content: space-between; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .kl-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; max-width: 520px; }
-.kl-seg button { padding: 0 13px; }
+.kl-seg button { position: relative; padding: 0 13px; }
+.kl-seg button::after { content: ""; position: absolute; inset: -4px -1.5px; } /* 44px tall hit area inside the pill */
 .kl-tools { display: flex; gap: 6px; flex: none; }
 .kl-ic {
   display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; color: var(--fg);
@@ -134,7 +135,8 @@ registerToy('kelime', {
 .kl-ic svg { width: 21px; height: 21px; }
 
 .kl-mid { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--kl-gap, 12px); width: 100%; }
-.kl-meta { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 22px; color: var(--mute); }
+.kl-meta { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 22px; color: var(--mute); transition: opacity .2s; }
+.kl-mid.msg-on .kl-meta { opacity: 0; pointer-events: none; } /* the message bubble sits on top of this line */
 .kl-meta b { color: var(--fg); font-weight: 600; }
 .kl-giveup { position: relative; height: 26px; padding: 0 10px; border-radius: 999px; color: var(--fg); box-shadow: inset 0 0 0 1.5px var(--line-2); font: inherit; letter-spacing: inherit; text-transform: inherit; }
 .kl-giveup::after { content: ""; position: absolute; inset: -10px -6px; }
@@ -185,28 +187,43 @@ registerToy('kelime', {
 .kl-msg small { display: block; margin-top: 3px; font: 500 12px/1.3 var(--f-mono); letter-spacing: .02em; opacity: .72; }
 
 .kl-foot { width: 100%; max-width: 540px; }
-.kl-root.side { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "head head" "mid foot"; align-items: center; column-gap: clamp(16px, 4vw, 40px); max-width: 980px; }
-.kl-root.side .kl-head { grid-area: head; max-width: none; }
-.kl-root.side .kl-mid { grid-area: mid; }
+/* Phone in landscape: board on the left at full height; mode switch + keyboard stacked and centred on the right. */
+.kl-root.side { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr auto auto 1fr; grid-template-areas: "mid ." "mid head" "mid foot" "mid ."; align-items: center; column-gap: clamp(16px, 4vw, 40px); max-width: 980px; }
+.kl-root.side .kl-head { grid-area: head; justify-self: center; max-width: 560px; }
+.kl-root.side .kl-mid { grid-area: mid; align-self: stretch; }
 .kl-root.side .kl-foot { grid-area: foot; justify-self: center; width: 100%; max-width: 560px; margin-inline: 0; }
 @media (max-width: 560px) { .kl-foot { width: calc(100% + 2 * var(--gutter) - 8px); max-width: none; margin-inline: calc(4px - var(--gutter)); } }
-.kl-kb { display: grid; gap: var(--kg, 8px); touch-action: manipulation; }
+/* Each key button fills its whole grid cell (the visible key is ::before), so taps in the gaps still land on the nearest key. */
+.kl-kb { display: grid; margin-block: calc(var(--kg, 8px) / -2); touch-action: none; }
 .kl-kr { display: grid; grid-template-columns: repeat(22, minmax(0, 1fr)); }
 .kl-key {
-  grid-column: span 2; display: grid; place-items: center; min-width: 0; height: var(--kh, 52px); margin: 0 2.5px; border-radius: 10px;
-  background: var(--panel); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line), inset 0 -2px 0 var(--line);
+  position: relative; isolation: isolate; grid-column: span 2; display: grid; place-items: center; min-width: 0;
+  height: calc(var(--kh, 52px) + var(--kg, 8px)); color: var(--fg);
   font: 650 clamp(15px, 4.6vw, 20px)/1 var(--f-display); letter-spacing: -.01em;
-  transition: background-color .25s, color .25s, opacity .25s, transform .14s var(--ease);
+  transition: color .25s, opacity .25s, transform .14s var(--ease);
 }
+.kl-key::before {
+  content: ""; position: absolute; z-index: -1; inset: calc(var(--kg, 8px) / 2) 2.5px; border-radius: 10px;
+  background: var(--panel); box-shadow: inset 0 0 0 1px var(--line), inset 0 -2px 0 var(--line);
+  transition: background-color .25s, box-shadow .25s;
+}
+.kl-key:focus-visible { outline: none; }
+.kl-key:focus-visible::before { outline: 2.5px solid var(--fg); outline-offset: 2px; }
 .kl-kr:first-child .kl-key:first-child { grid-column: 2 / span 2; }
+.kl-kr:first-child .kl-key:first-child::after, .kl-kr:first-child .kl-key:last-child::after { content: ""; position: absolute; top: 0; bottom: 0; width: 50%; }
+.kl-kr:first-child .kl-key:first-child::after { right: 100%; }
+.kl-kr:first-child .kl-key:last-child::after { left: 100%; }
 .kl-key.wide { grid-column: span 3; font-size: clamp(12px, 3.5vw, 15px); font-weight: 650; letter-spacing: 0; }
-.kl-key.enter { background: var(--fg); color: var(--bg); box-shadow: none; }
+.kl-key.enter { color: var(--bg); }
+.kl-key.enter::before { background: var(--fg); box-shadow: none; }
 .kl-key svg { width: 24px; height: 24px; }
-.kl-key[data-s="c"] { background: var(--green); color: var(--on-light); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .14); }
-.kl-key[data-s="p"] { background: var(--yellow); color: var(--on-light); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .1); }
-.kl-key[data-s="a"] { background: transparent; color: var(--mute); box-shadow: inset 0 0 0 1px var(--line); opacity: .6; }
+.kl-key[data-s="c"], .kl-key[data-s="p"] { color: var(--on-light); }
+.kl-key[data-s="c"]::before { background: var(--green); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .14); }
+.kl-key[data-s="p"]::before { background: var(--yellow); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .1); }
+.kl-key[data-s="a"] { color: var(--mute); opacity: .6; }
+.kl-key[data-s="a"]::before { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
 .kl-key.hit { transform: translateY(1px) scale(.93); }
-@media (hover: hover) { .kl-key:not([data-s]):not(.enter):hover { background: var(--panel-2); } }
+@media (hover: hover) { .kl-key:not([data-s]):not(.enter):hover::before { background: var(--panel-2); } }
 
 .kl-end { display: grid; align-content: center; justify-items: center; gap: 10px; min-height: calc(var(--kh, 52px) * 3 + var(--kg, 8px) * 2); padding: 4px 8px; text-align: center; animation: klup .5s var(--ease) both; }
 @keyframes klup { from { opacity: 0; transform: translateY(14px); } }
@@ -220,26 +237,31 @@ registerToy('kelime', {
 .kl-end-act .btn svg { width: 18px; height: 18px; }
 .kl-mini { display: flex; gap: 4px; }
 .kl-mini i {
-  display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; font: 750 16px/1 var(--f-display); font-style: normal;
+  position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; font: 750 16px/1 var(--f-display); font-style: normal;
   background: var(--panel-3); color: var(--mute);
 }
 .kl-mini i[data-s="c"] { background: var(--green); color: var(--on-light); }
 .kl-mini i[data-s="p"] { background: var(--yellow); color: var(--on-light); }
 .kl-mini i[data-s="x"] { background: var(--ink-tile); color: var(--ink-tile-fg); }
 .kl-mini i[data-s="n"] { background: var(--panel); color: var(--fg); box-shadow: inset 0 0 0 1.5px var(--line-2); }
+.kl-ex .kl-mini i[data-s="c"]::after, .kl-ex .kl-mini i[data-s="p"]::after, .kl-legend i.c::after, .kl-legend i.p::after {
+  content: ""; position: absolute; top: 11%; right: 11%; width: 13%; height: 13%; min-width: 3px; min-height: 3px; border-radius: 50%;
+}
+.kl-ex .kl-mini i[data-s="c"]::after, .kl-legend i.c::after { background: rgba(22, 23, 26, .5); }
+.kl-ex .kl-mini i[data-s="p"]::after, .kl-legend i.p::after { box-shadow: inset 0 0 0 1.5px rgba(22, 23, 26, .5); }
 .kl-root.tight .kl-end { gap: 8px; }
 .kl-root.tight .kl-end-txt b { font-size: 19px; }
-.kl-root.tight .kl-mini i { width: 26px; height: 26px; font-size: 14px; border-radius: 7px; }
+.kl-root.tight .kl-end .kl-mini i { width: 26px; height: 26px; font-size: 14px; border-radius: 7px; }
 .kl-root.tight .kl-end-act .btn { height: 44px; padding: 0 16px; font-size: 15px; }
 .kl-root.narrow .kl-end-top { gap: 10px; }
-.kl-root.narrow .kl-mini { gap: 3px; }
-.kl-root.narrow .kl-mini i { width: 22px; height: 22px; font-size: 12.5px; border-radius: 6px; }
+.kl-root.narrow .kl-end .kl-mini { gap: 3px; }
+.kl-root.narrow .kl-end .kl-mini i { width: 22px; height: 22px; font-size: 12.5px; border-radius: 6px; }
 .kl-root.narrow .kl-end-txt b { font-size: 18px; }
 .kl-root.narrow .kl-end-txt .mono { font-size: 10.5px; letter-spacing: .05em; }
 
 .kl-sheet-wrap { position: fixed; inset: 0; z-index: 70; display: grid; align-items: end; justify-items: center; background: rgba(10, 11, 13, .42); animation: fadein .25s; }
 .kl-sheet {
-  position: relative; width: min(100%, 460px); max-height: min(92vh, 720px); overflow: auto; overscroll-behavior: contain;
+  position: relative; width: min(100%, 460px); max-height: min(92vh, 720px); max-height: min(92dvh, 720px); overflow: auto; overscroll-behavior: contain;
   display: grid; gap: 16px; padding: 22px var(--gutter) calc(env(safe-area-inset-bottom, 0px) + 22px);
   border-radius: 26px 26px 0 0; background: var(--panel); color: var(--fg); box-shadow: 0 -20px 50px -30px var(--shade);
   animation: klsheet .45s var(--spring); user-select: text; -webkit-user-select: text;
@@ -274,7 +296,7 @@ registerToy('kelime', {
 .kl-ex .kl-mini i { width: 40px; height: 40px; font-size: 21px; border-radius: 10px; }
 .kl-legend { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .kl-legend li { display: flex; align-items: center; gap: 10px; font-size: 15px; }
-.kl-legend i { width: 18px; height: 18px; border-radius: 5px; flex: none; }
+.kl-legend i { position: relative; width: 22px; height: 22px; border-radius: 6px; flex: none; }
 .kl-legend .c { background: var(--green); } .kl-legend .p { background: var(--yellow); } .kl-legend .a { background: var(--panel-3); box-shadow: inset 0 0 0 1px var(--line-2); }
 .kl-tips { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--mute); font-size: 15px; }
 .kl-tips b { color: var(--fg); font-weight: 650; }
@@ -317,6 +339,7 @@ registerToy('kelime', {
     let dead = false, mode = 'daily', game = null, cur = '', busy = false, retry = null, sheetKind = null, countT = 0, msgT = 0, armT = 0;
     const timers = new Set();
     const later = (fn, ms) => { const id = setTimeout(() => { timers.delete(id); if (!dead) fn(); }, ms); timers.add(id); return id; };
+    const cancel = id => { if (id) { clearTimeout(id); timers.delete(id); } };
 
     /* ----- game state ----- */
     function save() {
@@ -394,34 +417,39 @@ registerToy('kelime', {
     }
     function paintMeta() {
       $$('[data-mode]', head).forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === mode));
-      metaT.innerHTML = game.mode === 'daily' ? `<b>#${game.day}</b> · ${dateLabel()}` : `<b>Serbest</b> · ${game.n}. kelime`;
+      metaT.innerHTML = game.mode === 'daily' ? `<b>#${game.day}</b> · ${dateLabel(game.day)}` : `<b>Serbest</b> · ${game.n}. kelime`;
       giveBtn.hidden = !(game.mode === 'free' && !game.done && game.guesses.length > 0);
       disarm();
     }
     function streakNow() { return liveStreak(loadStats(K_STATS), dayNum()); }
+    // A daily board finished after Istanbul midnight belongs to yesterday: no 24 h countdown, offer today's word instead.
+    const stale = () => game.mode === 'daily' && dayNum() !== game.day;
     function paintFoot() {
       const showEnd = game.done && !busy;
       kb.hidden = showEnd; endEl.hidden = !showEnd;
-      if (showEnd) {
-        const n = game.guesses.length, daily = game.mode === 'daily', k = daily ? streakNow() : 0;
+      if (!showEnd) endEl.innerHTML = ''; // a hidden countdown must not keep the 1 s ticker alive
+      else {
+        const n = game.guesses.length, daily = game.mode === 'daily', old = stale(), k = daily ? streakNow() : 0;
         const title = game.won ? WIN_WORDS[n - 1] : (game.gaveUp ? 'Pes ettin' : 'Bu sefer olmadı');
         const sub = daily ? `#${game.day} · ${game.won ? n : 'X'}/6${k > 0 ? ` · Seri ${k} gün` : ''}` : `Serbest · ${game.won ? n : 'X'}/6`;
         endEl.innerHTML = `
           <div class="kl-end-top">${miniRow(game.answer, Array(LEN).fill(game.won ? 'c' : 'x'))}<div class="kl-end-txt"><b>${title}</b><span class="mono">${sub}</span></div></div>
-          ${daily ? `<p class="mono kl-count">Yeni kelimeye <b data-count>${fmtCount()}</b></p>` : ''}
+          ${daily ? (old ? '<p class="mono kl-count">Yeni günün kelimesi hazır</p>' : `<p class="mono kl-count">Yeni kelimeye <b data-count>${fmtCount()}</b></p>`) : ''}
           <div class="kl-end-act">${daily
-            ? `<button type="button" class="btn primary" data-act="share">${ICO.share}Paylaş</button><button type="button" class="btn" data-mode="free">Serbest oyna</button>`
+            ? `<button type="button" class="btn primary" data-act="share">${ICO.share}Paylaş</button>${old ? '<button type="button" class="btn" data-act="today">Bugünün kelimesi</button>' : '<button type="button" class="btn" data-mode="free">Serbest oyna</button>'}`
             : `<button type="button" class="btn primary" data-act="new">Yeni kelime <kbd>Enter</kbd></button><button type="button" class="btn" data-act="share">${ICO.share}Paylaş</button>`}</div>`;
       }
       syncCount();
     }
-    function paintAll() { paintMeta(); paintBoard(); paintKeys(); paintFoot(); }
+    function hideMsg() { cancel(msgT); msgT = 0; msgEl.classList.remove('show'); mid.classList.remove('msg-on'); }
+    function paintAll() { hideMsg(); paintMeta(); paintBoard(); paintKeys(); paintFoot(); } // a new board never inherits the old bubble
 
     /* ----- feedback ----- */
     function msg(main, sub, ms = 1800) {
       msgEl.innerHTML = ''; msgEl.append(main);
       if (sub) { const s = document.createElement('small'); s.textContent = sub; msgEl.append(s); }
-      msgEl.classList.add('show'); clearTimeout(msgT); msgT = later(() => msgEl.classList.remove('show'), ms);
+      msgEl.classList.add('show'); mid.classList.add('msg-on');
+      cancel(msgT); msgT = later(hideMsg, ms);
     }
     function shake(r) {
       const row = rowsEls[r]; if (!row) return;
@@ -449,16 +477,27 @@ registerToy('kelime', {
       rowsEls[r].setAttribute('aria-label', `${r + 1}. tahmin: ${cur ? up(cur) : 'boş'}`);
       Sound.blip(620, 0.018, 0.025, 'triangle');
     }
+    // A daily board left open past Istanbul midnight with no guess yet quietly moves to the new day's word.
+    function freshDaily() {
+      if (!game || game.mode !== 'daily' || game.guesses.length || game.done || busy || sheetKind || !stale()) return false;
+      const keep = cur; loadGame('daily'); if (!game.done) cur = keep; paintAll();
+      return true;
+    }
     function submit() {
       if (!canType()) return;
+      if (freshDaily() && !canType()) return;
       const r = game.guesses.length;
       if (cur.length < LEN) { shake(r); msg('Beş harf gerekli'); say('Beş harf gerekli.'); return; }
       const w = cur, now = Date.now();
-      if (!allowedSet().has(w) && !(retry && retry.word === w && now - retry.t <= 4000)) {
-        retry = { word: w, t: now }; shake(r);
-        msg('Listede yok', 'Yine de denemek için tekrar Enter', 4000);
-        say('Listede yok. Yine de denemek için tekrar Enter.');
-        return;
+      if (!allowedSet().has(w)) {
+        const dt = retry && retry.word === w ? now - retry.t : Infinity;
+        if (dt < 350) return; // a double tap on Enter is not a deliberate “try it anyway”
+        if (dt > 4000) {
+          retry = { word: w, t: now }; shake(r);
+          msg('Listede yok', 'Yine de denemek için tekrar Enter', 4000);
+          say('Listede yok. Yine de denemek için tekrar Enter.');
+          return;
+        }
       }
       retry = null; commit(w);
     }
@@ -518,10 +557,10 @@ registerToy('kelime', {
       if (busy) return;
       game = newFree(game); save(); cur = ''; retry = null; paintAll(); focusBoard();
     }
-    function disarm() { clearTimeout(armT); delete giveBtn.dataset.armed; giveBtn.textContent = 'Pes et'; }
+    function disarm() { cancel(armT); armT = 0; delete giveBtn.dataset.armed; giveBtn.textContent = 'Pes et'; }
     function giveUp() {
       if (!game || game.mode !== 'free' || game.done || busy) return;
-      if (giveBtn.dataset.armed !== '1') { giveBtn.dataset.armed = '1'; giveBtn.textContent = 'Emin misin?'; clearTimeout(armT); armT = later(disarm, 3000); return; }
+      if (giveBtn.dataset.armed !== '1') { giveBtn.dataset.armed = '1'; giveBtn.textContent = 'Emin misin?'; cancel(armT); armT = later(disarm, 3000); return; }
       disarm(); cur = ''; game.gaveUp = true; settle(game); record(); save();
       paintAll(); focusBoard();
       msg(`Kelime: ${up(game.answer)}`, null, 3000); say(`Pes ettin. Kelime ${up(game.answer)}.`);
@@ -534,13 +573,16 @@ registerToy('kelime', {
       return `Sıkıldım · Kelime ${tag} ${game.won ? game.guesses.length : 'X'}/6\n\n${rows}`;
     }
     function share() { if (game && game.done) shareResult({ title: 'Sıkıldım · Kelime', text: shareText(), url: siteUrl() + '#kelime' }); }
+    function toToday(note) {
+      closeSheet(); loadGame('daily'); paintAll(); focusBoard();
+      if (note) { msg('Yeni kelime hazır'); say('Yeni kelime hazır.'); }
+    }
     function tickCount() {
       const nodes = $$('[data-count]', wrap);
       if (!nodes.length) { clearInterval(countT); countT = 0; return; }
+      // The countdown ran out while the result was on screen: bring in the new word.
+      if (game.mode === 'daily' && game.done && !busy && stale()) { toToday(true); return; }
       const t = fmtCount(); nodes.forEach(n => { n.textContent = t; });
-      if (mode === 'daily' && game.mode === 'daily' && game.done && !busy && dayNum() !== game.day) {
-        closeSheet(); loadGame('daily'); paintAll(); msg('Yeni kelime hazır'); say('Yeni kelime hazır.');
-      }
     }
     function syncCount() {
       const any = !!wrap.querySelector('[data-count]');
@@ -556,7 +598,8 @@ registerToy('kelime', {
         return `<div class="kl-dr${i === now ? ' now' : ''}"><span class="mono" aria-hidden="true">${i + 1}</span><div class="kl-dt" role="img" aria-label="${i + 1}. denemede ${v} kez">${v ? `<i style="width:${w.toFixed(2)}%;animation-delay:${i * 50}ms"></i>` : ''}<b style="left:calc(${w.toFixed(2)}% + 7px)">${v}</b></div></div>`;
       }).join('');
       let footHTML;
-      if (daily && game.done) footHTML = `<p class="mono kl-count">Yeni kelimeye<b data-count>${fmtCount()}</b></p><button type="button" class="btn primary" data-act="share">${ICO.share}Paylaş</button>`;
+      if (daily && game.done && stale()) footHTML = `<p class="note">Yeni günün kelimesi hazır.</p><button type="button" class="btn primary" data-act="share">${ICO.share}Paylaş</button>`;
+      else if (daily && game.done) footHTML = `<p class="mono kl-count">Yeni kelimeye<b data-count>${fmtCount()}</b></p><button type="button" class="btn primary" data-act="share">${ICO.share}Paylaş</button>`;
       else if (daily) footHTML = '<p class="note">Bugünkü kelimeyi bitirince sonucunu buradan paylaşabilirsin.</p>';
       else footHTML = `<p class="note">Serbest oyunlar günlük seriden ayrı sayılır.</p>${game.done ? `<button type="button" class="btn primary" data-act="share">${ICO.share}Paylaş</button>` : ''}`;
       return `
@@ -571,7 +614,7 @@ registerToy('kelime', {
         <div class="kl-dist">${bars}</div>
         <div class="kl-sh-foot">${footHTML}</div>`;
     }
-    function helpHTML() {
+    function helpHTML(first) {
       return `
         <div class="kl-sh-top"><div><h2 id="kl-sh-h">Nasıl oynanır</h2><span class="mono">Altı deneme · beş harf</span></div><button type="button" class="kl-ic" data-act="close" aria-label="Kapat">${ICO.close}</button></div>
         <div class="kl-help"><p><strong>Beş harfli kelimeyi altı denemede bul.</strong> Her denemeden sonra harflerin rengi sana ipucu verir.</p></div>
@@ -591,19 +634,20 @@ registerToy('kelime', {
           <li>Listede olmayan bir kelimeyi yine de denemek için <b>Enter’a iki kez</b> bas.</li>
           <li><b>I</b> ile <b>İ</b> ayrı harfler; klavyede ikisi de var.</li>
         </ul>
-        <button type="button" class="btn primary" data-act="close">Başla</button>`;
+        <button type="button" class="btn primary" data-act="close">${first ? 'Başla' : 'Tamam'}</button>`;
     }
     function openSheet(kind) {
       if (dead) return;
+      const first = kind === 'help' && !store.get(K_HELP, false);
+      if (kind === 'help') store.set(K_HELP, true); // seen once is enough, however it gets closed
       sheetKind = kind;
-      sheet.innerHTML = kind === 'stats' ? statsHTML() : helpHTML();
+      sheet.innerHTML = kind === 'stats' ? statsHTML() : helpHTML(first);
       sheetWrap.hidden = false; head.inert = mid.inert = foot.inert = true;
       sheet.scrollTop = 0; sheet.focus({ preventScroll: true });
       syncCount();
     }
     function closeSheet() {
       if (!sheetKind) return;
-      if (sheetKind === 'help') store.set(K_HELP, true);
       sheetKind = null; sheetWrap.hidden = true; sheet.innerHTML = ''; head.inert = mid.inert = foot.inert = false;
       syncCount(); focusBoard(); // typing continues right away; Enter must not re-trigger the opener
     }
@@ -621,11 +665,11 @@ registerToy('kelime', {
       const cs = getComputedStyle(el), ws = getComputedStyle(wrap);
       const H = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - parseFloat(ws.marginTop) - parseFloat(ws.marginBottom);
       const W = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      const side = H < 520 && W >= 600; // phone in landscape: board left, keyboard right
+      const side = H < 520 && W >= 500 && W > H * 1.3; // phone in landscape: board left at full height, controls right
       const tight = H < 600;
       const kh = Math.round(clamp(side ? (H - 60) / 4.2 : H * 0.068, 42, 58)), kg = tight ? 6 : 8, gap = tight ? 8 : 12;
       const kbH = kh * 3 + kg * 2, headH = 44, metaH = 22;
-      const boardH = side ? H - headH - metaH - gap * 2 - 4 : H - headH - kbH - metaH - gap * 3 - 6;
+      const boardH = side ? H - metaH - gap - 4 : H - headH - kbH - metaH - gap * 3 - 6;
       const boardW = side ? W * 0.42 : Math.min(W - 20, 420);
       let t = Math.min((boardW - 24) / 5, (boardH - 25) / 6);
       const tg = Math.round(clamp(t * 0.1, 4, 7));
@@ -639,17 +683,52 @@ registerToy('kelime', {
     layout();
 
     /* ----- events ----- */
-    const keyDown = new Map();
+    /* Keys fire per pointer, so fast two-thumb typing never loses a letter (browsers drop the click of a tap that
+       overlaps another touch). A key fires on release, or as soon as the next finger lands, which keeps letters in the
+       order they were pressed. The click that follows is swallowed; a click with no pointer press before it
+       (Space on a focused key, assistive tech) still types. */
+    const keyDown = new Map(), viaPtr = new Map();
+    const canPress = () => !dead && !kb.hidden && !sheetKind;
+    const fire = key => {
+      if (!canPress()) return;
+      const q = viaPtr.get(key) || []; q.push(performance.now()); viaPtr.set(key, q);
+      press(key.dataset.k);
+    };
     kb.addEventListener('pointerdown', e => {
-      const k = e.target.closest('[data-k]'); if (!k) return;
+      const k = e.target.closest('[data-k]'); if (!k || (e.pointerType === 'mouse' && e.button !== 0)) return;
       if (e.pointerType === 'mouse') e.preventDefault();
-      k.classList.add('hit'); keyDown.set(e.pointerId, k);
+      const now = performance.now();
+      keyDown.forEach((d, id) => {
+        if (now - d.t > 3000) { d.k.classList.remove('hit'); keyDown.delete(id); } // a release we never saw
+        else if (!d.fired) { d.fired = true; fire(d.k); } // rolling input: commit the earlier key now
+      });
+      k.classList.add('hit'); keyDown.set(e.pointerId, { k, t: now, fired: false });
     });
-    const release = e => { const k = keyDown.get(e.pointerId); if (k) { k.classList.remove('hit'); keyDown.delete(e.pointerId); } };
-    kb.addEventListener('pointerup', release); kb.addEventListener('pointercancel', release); kb.addEventListener('pointerleave', release);
+    const release = (e, commit) => {
+      const d = keyDown.get(e.pointerId); if (!d) return;
+      d.k.classList.remove('hit'); keyDown.delete(e.pointerId);
+      if (!commit || d.fired) return;
+      const r = d.k.getBoundingClientRect(), slop = 10;
+      let key = d.k;
+      if (e.clientX < r.left - slop || e.clientX > r.right + slop || e.clientY < r.top - slop || e.clientY > r.bottom + slop) {
+        const under = document.elementFromPoint(e.clientX, e.clientY), u = under && under.closest ? under.closest('[data-k]') : null;
+        key = u && kb.contains(u) ? u : null; // slid onto another key: that one; slid off the keyboard: nothing
+      }
+      if (key) fire(key);
+    };
+    kb.addEventListener('pointerup', e => release(e, true));
+    kb.addEventListener('pointercancel', e => release(e, false));
+    kb.addEventListener('pointerleave', e => release(e, false));
+    kb.addEventListener('contextmenu', e => e.preventDefault());
     head.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.target.closest('button')) e.preventDefault(); });
     wrap.addEventListener('click', e => {
-      const k = e.target.closest('[data-k]'); if (k && kb.contains(k)) { press(k.dataset.k); return; }
+      const k = e.target.closest('[data-k]');
+      if (k && kb.contains(k)) {
+        const q = viaPtr.get(k), now = performance.now();
+        while (q && q.length && now - q[0] > 1500) q.shift();
+        if (q && q.length) { q.shift(); return; } // already typed on pointerup
+        press(k.dataset.k); return;
+      }
       const m = e.target.closest('[data-mode]'); if (m) { setMode(m.dataset.mode); return; }
       const a = e.target.closest('[data-act]');
       if (!a) { if (e.target === sheetWrap) closeSheet(); return; }
@@ -659,10 +738,13 @@ registerToy('kelime', {
         case 'close': closeSheet(); break;
         case 'share': share(); break;
         case 'new': startNewFree(); break;
+        case 'today': toToday(false); break;
         case 'giveup': giveUp(); break;
         default: break;
       }
     });
+    const onVis = () => { if (!dead && document.visibilityState === 'visible') freshDaily(); };
+    document.addEventListener('visibilitychange', onVis);
 
     /* ----- boot ----- */
     const daily0 = store.get(K_DAILY, null), todayDone = daily0 && daily0.day === dayNum() && daily0.done;
@@ -676,6 +758,14 @@ registerToy('kelime', {
         if (isField(e.target)) return;
         const k = e.key;
         if (sheetKind) {
+          if (k === 'Escape') { e.preventDefault(); closeSheet(); return; } // close the sheet, stay in the toy
+          if (k === 'Tab') { // keep focus inside the dialog
+            const f = $$('button, a[href]', sheet).filter(b => !b.disabled && b.getClientRects().length), a = document.activeElement;
+            if (!f.length) { e.preventDefault(); return; }
+            if (e.shiftKey && (a === f[0] || !f.includes(a))) { e.preventDefault(); f[f.length - 1].focus(); }
+            else if (!e.shiftKey && (a === f[f.length - 1] || !f.includes(a))) { e.preventDefault(); f[0].focus(); }
+            return;
+          }
           const onBtn = e.target && e.target.closest && e.target.closest('button');
           if (k === 'Enter' && !onBtn) { e.preventDefault(); closeSheet(); }
           return;
@@ -698,7 +788,8 @@ registerToy('kelime', {
         timers.forEach(clearTimeout); timers.clear();
         clearInterval(countT); countT = 0;
         if (ro) ro.disconnect();
-        keyDown.clear();
+        document.removeEventListener('visibilitychange', onVis);
+        keyDown.clear(); viaPtr.clear();
       },
     };
   },

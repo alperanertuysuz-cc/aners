@@ -66,6 +66,8 @@ registerToy('yilan', {
 .yilan-root .yl-tools { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .yilan-root .yl-mode { height: 44px; padding: 0 14px 0 12px; gap: 7px; }
 .yilan-root .yl-mode svg { width: 16px; height: 16px; flex: none; }
+.yilan-root .yl-mode[disabled] { opacity: .4; cursor: default; transform: none; }
+.yilan-root .yl-mode[disabled]:not([aria-pressed="true"]) { color: var(--mute); box-shadow: inset 0 0 0 1.5px var(--line-2); }
 .yilan-root .yl-mode .wall { stroke-dasharray: none; }
 .yilan-root .yl-mode[aria-pressed="true"] .wall { stroke-dasharray: 3.2 2.6; }
 .yilan-root .yl-pause {
@@ -85,6 +87,7 @@ registerToy('yilan', {
   position: relative; flex: none; border-radius: var(--r-lg); overflow: hidden;
   background: var(--panel); box-shadow: inset 0 0 0 1px var(--line), 0 26px 50px -38px var(--shade);
 }
+.yilan-root .yl-board:focus { outline: none; }
 .yilan-root .yl-board canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .yilan-root .yl-over {
   position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 16px; text-align: center;
@@ -92,6 +95,8 @@ registerToy('yilan', {
 }
 .yilan-root .yl-over[data-kind="ready"] { align-items: end; padding-bottom: max(16px, 9%); }
 .yilan-root .yl-over[data-kind="paused"] { background: color-mix(in srgb, var(--panel) 52%, transparent); }
+.yilan-root .yl-over[data-kind="paused"][data-side="bottom"] { align-items: end; padding-bottom: max(16px, 9%); }
+.yilan-root .yl-over[data-kind="paused"][data-side="top"] { align-items: start; padding-top: max(16px, 9%); }
 .yilan-root .yl-over[data-kind="over"] {
   background: color-mix(in srgb, var(--panel) 74%, transparent); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
 }
@@ -144,7 +149,7 @@ registerToy('yilan', {
             <button type="button" class="yl-pause" id="yl-pause" aria-label="Duraklat" data-paused="false">${PAUSE_SVG}${ICON.play.replace('<svg', '<svg class="ic-play"')}</button>
           </div>
         </div>
-        <div class="yl-board" id="yl-board">
+        <div class="yl-board" id="yl-board" tabindex="-1">
           <canvas id="yl-cv" role="img" aria-label="Yılan oyun alanı"></canvas>
           <div class="yl-over" id="yl-over" hidden></div>
         </div>
@@ -363,7 +368,9 @@ registerToy('yilan', {
       pauseBtn.dataset.paused = state === 'paused';
       pauseBtn.setAttribute('aria-label', state === 'paused' ? 'Devam et' : 'Duraklat');
       pauseBtn.disabled = state !== 'run' && state !== 'paused';
+      modeBtn.disabled = inGame();   // switching mode restarts, so it waits until the round is over
     }
+    const inGame = () => state === 'run' || state === 'paused' || state === 'dying';
     function bumpScore() { if (motionOK()) scoreEl.animate([{ transform: 'scale(1.22)' }, { transform: 'none' }], { duration: 280, easing: 'cubic-bezier(.3,1.45,.55,1)' }); }
     function stopLoop() { if (raf) cancelAnimationFrame(raf); raf = 0; }
     function loop() { if (!raf && alive) { last = performance.now(); raf = requestAnimationFrame(frame); } }
@@ -399,6 +406,7 @@ registerToy('yilan', {
     function pause() {
       if (state !== 'run') return;
       state = 'paused'; stopLoop(); queue = [];
+      fx = []; gulp = null;                 // effects run on wall-clock time; don't freeze them mid-flight
       showOverlay('paused'); updateHud(); draw();
       say('Duraklatıldı');
     }
@@ -482,13 +490,14 @@ registerToy('yilan', {
       showOverlay('over');
       const b = overEl.querySelector('[data-act="again"]');
       if (b) b.focus({ preventScroll: true });
-      say(`${CAUSE[cause]}. Skor ${score}.${score > startBest && score > 0 ? ' Yeni rekor!' : ''}`);
+      say(`${(CAUSE[cause] || 'Oyun bitti').replace(/[.!]$/, '')}. Skor ${score}.${score > startBest && score > 0 ? ' Yeni rekor!' : ''}`);
     }
     function showOverlay(kind) {
       overEl.hidden = false; overEl.dataset.kind = kind;
       if (kind === 'ready') {
         overEl.innerHTML = `<div class="yl-card">${SWIPE_SVG}<p class="yl-title">Kaydır ve başla</p><p class="mono yl-sub"><span class="yl-touch">Her yerden kaydırabilirsin</span><span class="yl-keys">Ok tuşları ya da WASD</span></p></div>`;
       } else if (kind === 'paused') {
+        overEl.dataset.side = snake.length && (snake[0].y + 0.5) / rows > 0.5 ? 'top' : 'bottom';   // keep the head in view
         overEl.innerHTML = `<div class="yl-card"><p class="yl-title">Durdu</p><p class="mono yl-sub"><span class="yl-touch">Devam etmek için dokun</span><span class="yl-keys">Devam için boşluk ya da tıkla</span></p></div>`;
       } else {
         const rec = score > startBest && score > 0;
@@ -508,12 +517,14 @@ registerToy('yilan', {
     /* ---------- input ---------- */
     let sw = null;
     function tap() { if (state === 'ready') start(null); else if (state === 'paused') resume(); }
+    const dirOf = (dx, dy) => (Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? DIRS.R : DIRS.L) : (dy > 0 ? DIRS.D : DIRS.U));
     const onDown = e => {
       if (e.button > 0 || sw || !alive) return;
-      if (e.target.closest('button, a, input')) return;
+      const ctl = e.target.closest('button, a, input');
+      if (ctl && !ctl.disabled) return;       // a locked control still lets a swipe start on it, but never counts as a tap
       if (e.pointerType === 'mouse') e.preventDefault();
       Sound.ensure();
-      sw = { id: e.pointerId, x: e.clientX, y: e.clientY, n: 0 };
+      sw = { id: e.pointerId, x: e.clientX, y: e.clientY, n: 0, ctl: !!ctl };
       try { el.setPointerCapture(e.pointerId); } catch (err) {}
     };
     const onMove = e => {
@@ -522,13 +533,16 @@ registerToy('yilan', {
       if (Math.max(ax, ay) < (sw.n ? 24 : 14)) return;
       if (sw.n && Math.max(ax, ay) < Math.min(ax, ay) * 1.5) return; // ambiguous diagonal after a turn: wait for intent
       sw.x = e.clientX; sw.y = e.clientY; sw.n++;
-      turn(ax > ay ? (dx > 0 ? DIRS.R : DIRS.L) : (dy > 0 ? DIRS.D : DIRS.U));
+      turn(dirOf(dx, dy));
     };
     const onUp = e => {
       if (!sw || e.pointerId !== sw.id) return;
-      const tapped = sw.n === 0; sw = null;
+      const s = sw; sw = null;
       Sound.ensure();
-      if (tapped) tap();
+      if (s.n) return;
+      const dx = e.clientX - s.x, dy = e.clientY - s.y;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) >= 14) turn(dirOf(dx, dy));   // a flick whose only movement arrived with the release
+      else if (!s.ctl) tap();
     };
     const onCancel = e => { if (sw && e.pointerId === sw.id) sw = null; };
     el.addEventListener('pointerdown', onDown);
@@ -536,7 +550,11 @@ registerToy('yilan', {
     el.addEventListener('pointerup', onUp);
     el.addEventListener('pointercancel', onCancel);
 
-    modeBtn.addEventListener('click', () => {
+    /* After a mouse click, hand focus back to the board so Space/Enter act on the game instead of re-pressing the button. */
+    const refocus = e => { if (e.detail) board.focus({ preventScroll: true }); };
+    modeBtn.addEventListener('click', e => {
+      refocus(e);
+      if (inGame()) return;
       mode = mode === 'duvar' ? 'duvarsiz' : 'duvar';
       store.set('yilan-mode', mode);
       modeBtn.setAttribute('aria-pressed', mode === 'duvarsiz');
@@ -544,7 +562,7 @@ registerToy('yilan', {
       newGame();
       say(mode === 'duvarsiz' ? 'Duvarsız mod: kenardan çıkan öbür taraftan girer.' : 'Duvarlı mod: kenara çarpınca oyun biter.');
     });
-    pauseBtn.addEventListener('click', () => { if (state === 'run') pause(); else if (state === 'paused') resume(); });
+    pauseBtn.addEventListener('click', e => { refocus(e); if (state === 'run') pause(); else if (state === 'paused') resume(); });
     overEl.addEventListener('click', e => {
       const b = e.target.closest('[data-act]'); if (!b) return;
       if (b.dataset.act === 'again') { newGame(); return; }
@@ -565,12 +583,15 @@ registerToy('yilan', {
     let ro = null, lastW = el.clientWidth, lastH = el.clientHeight;
     if ('ResizeObserver' in window) {
       ro = new ResizeObserver(() => {
-        if (el.clientWidth === lastW && el.clientHeight === lastH) return;
-        lastW = el.clientWidth; lastH = el.clientHeight;
+        const w = el.clientWidth, h = el.clientHeight;
+        if (w === lastW && h === lastH) return;
+        const big = w !== lastW || Math.abs(h - lastH) > lastH * 0.15;   // rotation or a real resize, not a toolbar wobble
+        lastW = w; lastH = h;
         cancelAnimationFrame(relayRaf);
         relayRaf = requestAnimationFrame(() => {
           if (!alive) return;
-          if (state === 'ready') newGame(); else { layout(false); draw(); }
+          if (state === 'ready') newGame();
+          else { if (big && state === 'run') pause(); layout(false); draw(); }   // the board just changed size under the player: stop first
         });
       });
       ro.observe(el);
@@ -585,13 +606,15 @@ registerToy('yilan', {
         if (isField(e.target)) return;
         const k = e.key.length === 1 ? e.key.toLocaleLowerCase('tr') : e.key;
         if (KEYS[k]) { e.preventDefault(); Sound.ensure(); turn(KEYS[k]); return; }
+        const btn = e.target && e.target.closest ? e.target.closest('button, a') : null;
+        if ((k === ' ' || k === 'Enter') && btn && rootEl.contains(btn)) return;   // a focused toy button (e.g. Paylaş) does its own thing
         if (k === ' ' || k === 'p') {
           e.preventDefault(); if (e.repeat) return;
           Sound.ensure();
           if (state === 'run') pause(); else if (state === 'paused') resume(); else if (state === 'ready') start(null); else if (state === 'over' && k === ' ') newGame();
           return;
         }
-        if (k === 'Enter' && state === 'over' && !(e.target.closest && e.target.closest('button'))) { e.preventDefault(); newGame(); }
+        if (k === 'Enter' && state === 'over' && !btn) { e.preventDefault(); newGame(); }
       },
       destroy() {
         alive = false; state = 'gone';

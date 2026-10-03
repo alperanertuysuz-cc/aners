@@ -11,6 +11,8 @@ const MODES = {
 };
 const MODE_IDS = ['klasik', 'ses', 'hedef'];
 const TARGETS = 10, PENALTY = 100, SLOP = 8, DEAF_MS = 3000;
+const ANTICIPATE = 100;                                            // faster than this is a guess, not a reaction
+const HOLD = { result: 600, early: 350 };                           // ignore stray taps right after a round ends (also covers "deaf")
 const HIT_STEPS = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];              // pentatonic climb, one note per target
 
 const num = v => (typeof v === 'number' && isFinite(v) && v > 0 ? Math.round(v) : null);
@@ -31,10 +33,6 @@ const GLYPH = {
   hedef: '<svg viewBox="0 0 56 56" fill="none" aria-hidden="true"><circle cx="28" cy="28" r="25.5" stroke="currentColor" stroke-width="2" opacity=".25"/><circle cx="28" cy="28" r="17" fill="currentColor"/><circle class="rf-hole" cx="28" cy="28" r="10"/><circle cx="28" cy="28" r="4.5" fill="currentColor"/></svg>',
 };
 const SHARE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/><path d="M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/></svg>';
-
-/* Sound.onChange has no unsubscribe, so subscribe once per page and forward to whichever instance is mounted. */
-let soundHook = null;
-Sound.onChange(v => { if (soundHook) soundHook(v); });
 
 registerToy('refleks', {
   name: 'Refleks', color: 'green', cf: 'on-light', kind: 'Tepki', open: 'Refleks’i aç',
@@ -71,7 +69,7 @@ registerToy('refleks', {
 .refleks-root { flex: 1 0 auto; justify-content: center; gap: clamp(10px, 1.7vh, 18px); user-select: none; -webkit-user-select: none; }
 .refleks-root .rf-w { width: min(100%, 920px); }
 .refleks-root .rf-modes { flex-wrap: nowrap; }
-.refleks-root .rf-modes button { min-height: 40px; padding: 0 18px; }
+.refleks-root .rf-modes button { min-height: 44px; padding: 0 18px; }
 
 .refleks-root .rf-box { position: relative; flex: 1 1 0; min-height: 210px; max-height: 470px; }
 .refleks-root .rf-arena {
@@ -200,7 +198,7 @@ registerToy('refleks', {
   mount(el) {
     let mode = readMode(), M = MODES[mode];
     let hist = readHist(M.hist), best = readBest(M.best);
-    let state = 'idle', timer = 0, deafT = 0, raf = 0, t0 = 0, downAt = -1e9, keyed = false, alive = true;
+    let state = 'idle', timer = 0, deafT = 0, raf = 0, t0 = 0, downAt = -1e9, keyAt = -1e9, holdUntil = 0, alive = true;
     let beep = null, run = null, tg = null, last = null, grow = false;
 
     el.innerHTML = `
@@ -239,6 +237,7 @@ registerToy('refleks', {
         wait: ['Bekle…', 'Yeşili bekle.'],
         go: ['Şimdi!', ' '],
         early: ['Erken davrandın', 'Yeşili beklemen lazım. Tekrar denemek için dokun.'],
+        guess: ['Çok erken', `${ANTICIPATE} ms’nin altı tahmin sayılır. Tekrar denemek için dokun.`],
       },
       ses: {
         idle: ['Başlamak için dokun', 'Ekran hiç değişmeyecek. Bip sesini duyduğun anda dokun.'],
@@ -258,6 +257,7 @@ registerToy('refleks', {
     function view(vs, key, big, small) {
       const c = (COPY[mode] && COPY[mode][key]) || COPY.klasik[key] || ['', ''];
       arena.dataset.state = vs;
+      holdUntil = HOLD[vs] ? performance.now() + HOLD[vs] : 0;
       bigEl.textContent = big != null ? big : c[0];
       smallEl.textContent = small != null ? small : c[1];
       capEl.textContent = '';
@@ -323,12 +323,12 @@ registerToy('refleks', {
       if (beep) { try { beep.stop(); } catch (e) {} beep = null; }
       run = null; tg = null; targetEl.hidden = true;
     }
-    function early() {
-      cancel(); state = 'early'; view('early', 'early');
+    function early(key) {
+      cancel(); state = 'early'; view('early', key || 'early');
       Sound.buzz(); vibrate(40);
     }
 
-    /* ---------- Klasik (unchanged rules: random 1.4–4.2 s wait, green, tap) ---------- */
+    /* ---------- Klasik (V1 rules: random 1.4–4.2 s wait, green, tap; under ANTICIPATE ms is a guess) ---------- */
     function startKlasik() {
       state = 'wait'; view('wait', 'wait');
       timer = setTimeout(() => { raf = requestAnimationFrame(() => { if (!alive || state !== 'wait') return; state = 'go'; view('go', 'go'); t0 = performance.now(); }); }, rand(1400, 4200));
@@ -373,8 +373,11 @@ registerToy('refleks', {
       const m = run ? run.misses : 0;
       missEl.textContent = m ? `+${m * PENALTY} ms` : '';
     }
-    function startHedef() {
-      run = { times: [], misses: 0, w: arena.clientWidth }; tg = null;
+    function startHedef(e) {
+      const rect = arena.getBoundingClientRect();
+      /* where the finger already is counts as the previous target, so the first one can't pop up right under it */
+      const from = e && e.clientX != null ? { x: e.clientX - rect.left, y: e.clientY - rect.top } : null;
+      run = { times: [], misses: 0, w: arena.clientWidth, from }; tg = null;
       state = 'ready'; view('ready', 'ready'); renderHud();
       timer = setTimeout(nextTarget, rand(650, 1050));
     }
@@ -382,12 +385,16 @@ registerToy('refleks', {
       if (!alive || !run) return;
       const W = arena.clientWidth, H = arena.clientHeight;
       const D = Math.round(clamp(Math.min(W, H) * 0.17, 54, 84)), r = D / 2, pad = 12, top = 46;
-      const minGap = Math.min(W, H) * 0.34, prev = tg;
-      let x = W / 2, y = (top + H) / 2;
-      for (let i = 0; i < 40; i++) {
-        x = rand(pad + r, W - pad - r); y = rand(top + r, H - pad - r);
-        if (!prev || Math.hypot(x - prev.x, y - prev.y) >= minGap) break;
-      }
+      /* every hop lands in the same distance band, so a round's score depends on the player, not on lucky short jumps */
+      const minGap = Math.min(W, H) * 0.34, maxGap = Math.min(W, H) * 0.7, prev = tg || run.from;
+      const spot = ok => {
+        for (let i = 0; i < 60; i++) {
+          const x = rand(pad + r, W - pad - r), y = rand(top + r, H - pad - r);
+          if (!prev || ok(Math.hypot(x - prev.x, y - prev.y))) return { x, y };
+        }
+        return null;
+      };
+      const { x, y } = spot(d => d >= minGap && d <= maxGap) || spot(d => d >= minGap) || { x: W / 2, y: (top + H) / 2 };
       tg = { x, y, r, t0: 0, live: false };
       raf = requestAnimationFrame(() => {
         if (!alive || !run || !tg) return;
@@ -419,15 +426,15 @@ registerToy('refleks', {
         else setTimeout(() => n.remove(), 600);
       }
     }
-    function hedefDown(e) {
+    function hedefDown(e, at) {
       if (state === 'ready') return;                       // the first target isn't up yet: no penalty
-      if (state !== 'run') { startHedef(); return; }
-      if (!tg || !tg.live || !e) return;                   // between targets (one frame) or a keyboard press
-      const now = performance.now(), rect = arena.getBoundingClientRect();
+      if (state !== 'run') { startHedef(e); return; }
+      if (!tg || !tg.live || !e || at < tg.t0) return;     // between targets, a keyboard press, or a touch that predates this target
+      const rect = arena.getBoundingClientRect();
       const x = e.clientX - rect.left, y = e.clientY - rect.top;
       if (Math.hypot(x - tg.x, y - tg.y) <= tg.r + SLOP) {
         tg.live = false; targetEl.hidden = true;
-        run.times.push(now - tg.t0);
+        run.times.push(at - tg.t0);
         const k = run.times.length;
         Sound.blip(523.25 * Math.pow(2, HIT_STEPS[k - 1] / 12), 0.06, 0.13, 'triangle');
         burst('rf-ghost', tg.x, tg.y);
@@ -444,23 +451,24 @@ registerToy('refleks', {
       const avg = Math.round((sum + misses * PENALTY) / TARGETS);
       cancel();
       const rec = record(avg), r = RATE.hedef(avg);
-      const cap = misses ? `Hedef başına · ${misses} ıska +${misses * PENALTY} ms` : 'Hedef başına · ıskasız';
+      const cap = misses ? `Hedef başına · ${misses} ıska dahil` : 'Hedef başına · ıskasız';
       showResult(avg, `${r} Tekrar için dokun.`, rec, { misses }, cap);
       vibrate(10);
       say(`Hedef başına ${avg} milisaniye. ${misses ? misses + ' ıska.' : 'Iskasız.'} ${r}${rec.isBest ? ' Yeni rekor.' : ''}`);
     }
 
     /* ---------- input ---------- */
-    function act(e) {
-      if (mode === 'hedef') { hedefDown(e); return; }
+    /* when the finger or key actually went down, on the performance clock (not when this handler got to run) */
+    const evT = e => { const now = performance.now(); return e && e.timeStamp > 0 && e.timeStamp <= now && now - e.timeStamp < 1000 ? e.timeStamp : now; };
+    function act(e, at) {
+      if (holdUntil && performance.now() < holdUntil) return;   // a stray double tap must not wipe the result
+      if (mode === 'hedef') { hedefDown(e, at); return; }
       if (state === 'wait') { early(); return; }
       if (state === 'go') {
-        const now = performance.now();
-        if (mode === 'ses') {
-          if (now < t0) { early(); return; }               // before the beep left the speaker: a guess
-          clearTimeout(deafT); beep = null;
-        }
-        finishVisual(Math.round(now - t0));
+        const ms = Math.round(at - t0);
+        if (ms < ANTICIPATE) { early(ms < 0 ? 'early' : 'guess'); return; }   // before the beep / green, or too fast to be a reaction
+        if (mode === 'ses') { clearTimeout(deafT); beep = null; }
+        finishVisual(ms);
         return;
       }
       if (mode === 'ses' && !Sound.on) {
@@ -496,11 +504,11 @@ registerToy('refleks', {
       if (e.button > 0) return;
       e.preventDefault(); downAt = performance.now();
       if (mode === 'ses') Sound.ensure();
-      act(e);
+      act(e, evT(e));
     });
     arena.addEventListener('pointerup', () => { if (mode === 'ses') Sound.ensure(); });   // some mobile browsers only unlock audio on pointerup
     /* Keyboard / assistive activation only: some browsers report detail 0 for the click that follows a tap, so skip clicks right after a press. */
-    arena.addEventListener('click', e => { if (e.detail === 0 && !keyed && performance.now() - downAt > 900) act(null); keyed = false; });
+    arena.addEventListener('click', e => { const n = performance.now(); if (e.detail === 0 && n - downAt > 900 && n - keyAt > 500) act(null, n); });
     arena.addEventListener('contextmenu', e => e.preventDefault());
     shareBtn.addEventListener('click', share);
     modesEl.addEventListener('click', e => {
@@ -518,27 +526,29 @@ registerToy('refleks', {
     };
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('resize', onResize);
-    soundHook = on => {
+    const offSound = Sound.onChange(on => {
       if (mode !== 'ses') return;
       if (!on && (state === 'wait' || state === 'go')) cancel();
       if (!['result', 'early'].includes(state) || !on) idle();
       else setGlyph();
-    };
+    });
 
     idle(); renderStats();
     return {
       onKey(e) {
         if (isField(e.target)) return;
         if (e.key === ' ' || e.key === 'Enter') {
-          if (e.target && e.target.closest && e.target.closest('.rf-share, .rf-modes')) return;   // let the focused control handle it
+          /* let a focused control handle it: share, the mode switch, or the stage bar's back / sound buttons */
+          const t = e.target;
+          if (t && t.closest && (t.closest('.rf-share, .rf-modes') || (!el.contains(t) && t.closest('button, a')))) return;
           e.preventDefault();
-          if (!e.repeat) { keyed = true; act(null); }
+          if (!e.repeat) { keyAt = performance.now(); act(null, evT(e)); }
         } else if (/^[1-3]$/.test(e.key) && !e.repeat) {
           e.preventDefault(); setMode(MODE_IDS[+e.key - 1]);
         }
       },
       destroy() {
-        alive = false; cancel(); soundHook = null;
+        alive = false; cancel(); if (typeof offSound === 'function') offSound();
         document.removeEventListener('visibilitychange', onVis);
         window.removeEventListener('resize', onResize);
       },

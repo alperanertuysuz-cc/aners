@@ -338,7 +338,8 @@ if (motionOK()) {
 const titleEl = $('.title');
 function fitTitle() {
   titleEl.style.fontSize = '';
-  const avail = titleEl.parentElement.clientWidth, need = titleEl.scrollWidth;
+  const main = titleEl.parentElement, twoCol = getComputedStyle(main).gridTemplateColumns.trim().split(/\s+/).length > 1;
+  const avail = main.clientWidth - (twoCol ? 440 : 0), need = titleEl.scrollWidth;
   if (need > avail) titleEl.style.fontSize = (parseFloat(getComputedStyle(titleEl).fontSize) * avail / need * 0.98).toFixed(1) + 'px';
 }
 let fitRaf = 0;

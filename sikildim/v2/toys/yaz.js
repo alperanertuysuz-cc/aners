@@ -28,25 +28,24 @@ registerToy('yaz', {
   name: 'Hızlı yaz', color: 'ink-tile', cf: 'ink-tile-fg', kind: 'Klavye', open: 'Hızlı yaz’ı aç',
   cats: ['oyun'],
   desc: 'Türkçe kelimelerle yazma hızı testi. 15, 30 ya da 60 saniye.',
-  art: '<p class="art-yaz"><span>kahve deniz yı</span><span class="caret"></span><span class="rest">ldız simit ritim</span></p>',
+  art: '<p class="art-yaz">kahve deniz <span class="nw">yı<span class="caret"></span><span class="rest">ldız</span></span><span class="rest"> simit ritim</span></p>',
   stat: () => { const yb = Math.max(...DURS.map(readBest)); return yb ? `Rekor ${yb} kelime/dk` : 'Türkçe kelimeler'; },
   css: `
 .art-yaz { width: 100%; max-width: 230px; font: 500 clamp(15px, 1.5vw, 19px)/1.5 var(--f-mono); }
 .art-yaz .rest { opacity: .38; }
+.art-yaz .nw { white-space: nowrap; }        /* never break "yıldız" at the caret */
 .art-yaz .caret { display: inline-block; width: 2px; height: 1.15em; margin: 0 1px; vertical-align: -.22em; background: var(--orange); animation: blink 1.05s steps(1) infinite; }
 
-/* Stat card: same look as the shared .stat rule, scoped so this toy does not depend on another toy's file. */
-.yaz-root .stat { display: grid; gap: 6px; align-content: start; padding: 14px 16px; border-radius: var(--r-md); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
-.yaz-root .stat .mono { color: var(--mute); }
-.yaz-root .stat b { font-size: clamp(22px, 2.6vw, 32px); font-weight: 700; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-
-.yaz-root { --yz-w: min(100%, 940px); --yz-pad: clamp(18px, 3vw, 32px); }
+.yaz-root { --yz-w: min(100%, 940px); --yz-pad: clamp(18px, 3vw, 32px); touch-action: manipulation; }
+.yaz-root .stat { align-content: start; }       /* card look comes from the shared .stat rule */
 .yaz-root .yz-top { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; width: var(--yz-w); }
 .yaz-root .yz-live { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
 .yaz-root .yz-timer { min-width: 1.15em; font-size: clamp(42px, 5vw, 64px); font-weight: 800; line-height: 1; letter-spacing: -.05em; font-variant-numeric: tabular-nums; transition: color .3s; }
 .yaz-root .yz-timer.low { color: var(--bad); }
 .yaz-root .yz-wpm { color: var(--mute); white-space: nowrap; }
 .yaz-root .yz-seg { flex: none; flex-wrap: nowrap; }
+.yaz-root .yz-seg button { position: relative; }
+.yaz-root .yz-seg button::after { content: ""; position: absolute; inset: -4px -1.5px; }      /* 44 px tall hit area, no gaps */
 .yaz-root.done .yz-top { justify-content: center; }
 .yaz-root.done .yz-live { display: none; }
 
@@ -137,6 +136,26 @@ registerToy('yaz', {
   .yaz-root.done .yz-foot { display: none; }
 }
 
+/* Short screens (landscape phones): tighter spacing so the test and the results fit without scrolling. */
+@media (max-height: 500px) {
+  .yaz-root { gap: 10px; }
+  .yaz-root .yz-timer { font-size: 36px; }
+  .yaz-root .yz-box { --yz-pad: 16px; }
+  .yaz-root .yz-res { gap: 6px; }
+  .yaz-root .yz-res .stat { padding: 10px 14px; gap: 4px; }
+  .yaz-root .yz-res .stat:not(.main) b { font-size: 24px; }
+  .yaz-root .yz-chart { padding: 10px 14px; }
+  .yaz-root .yz-plot { height: 44px; margin-top: 12px; }
+}
+@media (max-height: 500px) and (min-width: 641px) {
+  .yaz-root .yz-res .stat.main { grid-template-columns: auto minmax(0, 1fr); align-items: baseline; column-gap: 14px; }
+  .yaz-root .yz-res .stat.main .mono { grid-column: 1 / -1; }
+  .yaz-root .yz-res .stat.main b { font-size: 40px; }
+  .yaz-root .yz-chart { grid-column: 1 / 4; }
+  .yaz-root .yz-res-actions { grid-column: 4; flex-direction: column; flex-wrap: nowrap; justify-content: center; padding-top: 0; gap: 8px; }
+  .yaz-root .yz-res-actions .btn { width: 100%; }
+}
+
 /* Phone keyboard open: everything moves to the top so the words and the timer stay above the keyboard.
    The top row sticks under the stage bar; --yz-kb adds room to scroll the box clear of the keyboard on short screens. */
 .yaz-root.kb { margin: 0 auto auto; gap: 10px; padding-bottom: var(--yz-kb, 0px); }
@@ -144,6 +163,7 @@ registerToy('yaz', {
 .yaz-root.kb .yz-live { flex-direction: row; align-items: baseline; gap: 10px; }
 .yaz-root.kb .yz-timer { font-size: 34px; }
 .yaz-root.kb .yz-seg button { min-height: 34px; }
+.yaz-root.kb .yz-seg button::after { inset: -5px -1.5px; }
 .yaz-root.kb .yz-box { --yz-pad: 16px; }
 .yaz-root.kb .yz-note { display: none; }
 @media (max-width: 380px) { .yaz-root.kb .yz-wpm { display: none; } }
@@ -422,6 +442,8 @@ registerToy('yaz', {
           if (e.target && e.target.closest && e.target.closest('#yz-share, .yz-seg')) return;
           e.preventDefault(); newTest(true);
         }
+        /* Desktop: a letter typed after clicking elsewhere goes straight into the test instead of being lost. */
+        else if (!finished && document.activeElement !== input && e.key.length === 1 && /\p{L}/u.test(e.key) && !isField(e.target)) input.focus({ preventScroll: true });
       },
       destroy() {
         alive = false; clearInterval(tick); clearTimeout(endT); clearTimeout(idleT); caret = null;

@@ -37,9 +37,9 @@ registerToy('patlat', {
 .art-patlat i.p:nth-child(n+6):nth-child(-n+10) { transform: translateX(50%) scale(.84); }
 .tile:hover .art-patlat i:nth-child(4) { transform: scale(.84); background: rgba(0, 40, 100, .12); box-shadow: inset 0 2px 4px rgba(0, 40, 100, .22); }
 
-.patlat-root { gap: clamp(14px, 2.2vw, 24px); }
+.patlat-root { gap: clamp(14px, 2.2vw, 24px); touch-action: manipulation; }
 .patlat-root .pt-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 16px; width: min(100%, 980px); }
-.patlat-root .pt-count { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.patlat-root .pt-count { display: flex; align-items: baseline; gap: 10px; min-width: 0; user-select: none; -webkit-user-select: none; }
 .patlat-root .pt-count b { font-size: clamp(36px, 4.4vw, 56px); font-weight: 800; line-height: .9; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
 .patlat-root .pt-count .mono, .patlat-root .pt-sub { color: var(--mute); font-variant-numeric: tabular-nums; }
 .patlat-root .pt-sub { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; }
@@ -76,19 +76,34 @@ registerToy('patlat', {
 }
 .patlat-root .b.popped::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .9); animation: pt-burst .38s var(--ease) forwards; pointer-events: none; }
 @keyframes pt-burst { from { transform: scale(.7); opacity: 1; } to { transform: scale(1.45); opacity: 0; } }
-.patlat-root .pt-size button { min-height: 40px; padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; }
+.patlat-root .pt-size button { position: relative; min-height: 40px; padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; }
+@media (pointer: coarse) { .patlat-root .pt-size button::after { content: ""; position: absolute; inset: -2px -1.5px; } }   /* 44px hit area inside the pill */
 .patlat-root .pt-size i { flex: none; width: var(--d); height: var(--d); border-radius: 50%; background: currentColor; opacity: .35; }
 .patlat-root .pt-size button[aria-pressed="true"] i { opacity: .8; }
 @media (max-width: 359px) { .patlat-root .pt-new { padding: 0 14px; } .patlat-root .pt-size button { padding: 0 12px; } }
+/* A phone on its side: count, new-sheet button and sizes in a column on the left, the sheet fills the rest; nothing scrolls. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .patlat-root {
+    flex: 1 0 auto; margin-block: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto 1fr;
+    align-items: start; gap: 14px clamp(16px, 3vw, 28px);
+  }
+  .patlat-root .pt-head { grid-column: 1; grid-row: 1; width: auto; grid-template-columns: minmax(0, 1fr); justify-items: start; gap: 10px; }
+  .patlat-root .pt-sub { grid-row: 2; }
+  .patlat-root .pt-new { grid-row: 3; }
+  .patlat-root .pt-size { grid-column: 1; grid-row: 2; flex-wrap: nowrap; }
+  .patlat-root .pt-size button { padding: 0 13px; }
+  .patlat-root .pt-frame { grid-column: 2; grid-row: 1 / -1; width: 100%; }
+}
 `,
-  hint: 'Basılı tut ve sürükle · Boşluk rastgele · N yeni sayfa',
+  hint: 'Boşluk patlat · N yeni sayfa · 1–3 boy',
   mount(el) {
     let total = store.get('pt-total', 0), sheetNo = store.get('pt-sheets', 0) + 1;
     if (!Number.isFinite(total) || total < 0) total = 0;
     if (!Number.isFinite(sheetNo) || sheetNo < 1) sheetNo = 1;
     let size = store.get(K_SIZE, 'orta'); if (!SIZES[size]) size = 'orta';
     let hue = (sheetNo - 1) % SHEETS.length;   // advances with every new sheet, so consecutive sheets never share a colour
-    let popped = 0, count = 0, lastSound = 0, sheet = null, dirty = 0, down = null, w0 = 0, sheetW = 0, nextT = 0;
+    let popped = 0, count = 0, lastSound = 0, sheet = null, dirty = 0, w0 = 0, h0 = 0, sheetW = 0, sheetH = 0, nextT = 0, tabbed = false;
+    const downs = new Set();   // every finger on the sheet pops on its own
     const NEW_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>';
     el.innerHTML = `
       <div class="toy patlat-root">
@@ -103,6 +118,7 @@ registerToy('patlat', {
     const toyEl = $('.patlat-root', el), frame = $('#pt-frame', el), nEl = $('#pt-n', el), ofEl = $('#pt-of', el), totEl = $('#pt-total', el), sw = $('#pt-sw', el);
     const head = $('.pt-head', el), sizeEl = $('.pt-size', el);
     const body = el.closest('.stage-body') || el;
+    const side = matchMedia('(orientation: landscape) and (max-height: 520px)');   // same query as the side-by-side CSS
     function renderCount() {
       nEl.textContent = popped; ofEl.textContent = `/ ${count}`;
       totEl.textContent = `Sayfa ${sheetNo} · toplam ${fmt(total)} balon`;
@@ -112,19 +128,24 @@ registerToy('patlat', {
       node.style.setProperty('--pc', `var(--${t.c})`); node.style.setProperty('--sh', t.sh);
       sw.style.setProperty('--pc', `var(--${t.c})`);
     }
+    /* Height the sheet may use: the stage body minus its padding, and (stacked layout) minus the head and the size switch. */
+    function availH() {
+      const cs = getComputedStyle(body);
+      const inner = body.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+      if (side.matches) return inner - 2;
+      const rowGap = parseFloat(getComputedStyle(toyEl).rowGap) || 16;
+      return inner - head.offsetHeight - sizeEl.offsetHeight - rowGap * 2 - 2;
+    }
     function build() {
-      const W = frame.clientWidth; w0 = W;
+      const W = frame.clientWidth, H = availH(); w0 = W; h0 = H;
       const sz = SIZES[size], d = W < 560 ? 0 : 1;
       const s0 = sz.s[d], g0 = sz.g[d], pad = d ? 26 : 16;
       const cols = Math.max(4, Math.floor((W - pad * 2 - (s0 + g0) / 2 + g0) / (s0 + g0)));
       /* Scale bubble + gap a touch so the sheet fills the frame edge to edge. */
       const f = clamp((W - pad * 2) / ((cols + 0.5) * s0 + (cols - 0.5) * g0), 1, 1.3);
       const s = +(s0 * f).toFixed(2), gap = +(g0 * f).toFixed(2);
-      const cs = getComputedStyle(body), ts = getComputedStyle(toyEl);
-      const rowGap = parseFloat(ts.rowGap) || 16;
-      const availH = body.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0) - head.offsetHeight - sizeEl.offsetHeight - rowGap * 2 - 2;
       const pitch = (s + gap) * 0.866;
-      const rows = clamp(Math.floor((availH - pad * 2 - s) / pitch) + 1, 4, 18);
+      const rows = clamp(Math.floor((H - pad * 2 - s) / pitch) + 1, 4, 18);
       const sh = document.createElement('div'); sh.className = 'pt-sheet';
       sh.setAttribute('role', 'group'); sh.setAttribute('aria-label', `Balonlu naylon, ${rows * cols} balon`);
       sh.style.cssText = `--s:${s}px;--gap:${gap}px;--pad:${pad}px`;
@@ -133,20 +154,28 @@ registerToy('patlat', {
       for (let r = 0; r < rows; r++) html += '<div class="pt-row">' + '<span class="b"></span>'.repeat(cols) + '</div>';
       sh.innerHTML = html; count = rows * cols; popped = 0;
       sheetW = pad * 2 + (cols + 0.5) * s + (cols - 0.5) * gap;
+      sheetH = pad * 2 + s + (rows - 1) * pitch;
       return sh;
+    }
+    /* A sheet that no longer fits (4-row minimum, or the phone turned with pops on it) is scaled down rather than scrolled. */
+    function scaleToFit() {
+      const k = Math.min(1, frame.clientWidth / sheetW, availH() / sheetH);
+      sheet.style.transform = k < 0.995 ? `scale(${k})` : '';
+      frame.style.height = k < 0.995 ? `${Math.ceil(sheetH * k)}px` : '';
     }
     /* how: 'slide' (a fresh sheet slides in), 'fade' (same sheet re-laid out), 'none' */
     function newSheet(how) {
-      const old = sheet; sheet = build(); frame.append(sheet); renderCount();
+      const old = sheet; frame.style.height = ''; sheet = build(); frame.append(sheet); renderCount(); scaleToFit();
       const anim = motionOK() && how !== 'none';
       if (old) {
         if (anim && how === 'slide') {
           old.style.pointerEvents = 'none';
-          old.animate([{ transform: 'none' }, { transform: 'translateX(-112%) rotate(-3deg)' }], { duration: 560, easing: 'cubic-bezier(.6,0,.3,1)', fill: 'forwards' }).onfinish = () => old.remove();
-          sheet.animate([{ transform: 'translateX(112%) rotate(3deg)' }, { transform: 'none' }], { duration: 620, easing: 'cubic-bezier(.2,.8,.2,1)' });
+          const from = old.style.transform || 'none';
+          old.animate([{ transform: from }, { transform: 'translateX(-112%) rotate(-3deg)' }], { duration: 560, easing: 'cubic-bezier(.6,0,.3,1)', fill: 'forwards' }).onfinish = () => old.remove();
+          sheet.animate([{ transform: 'translateX(112%) rotate(3deg)' }, { transform: sheet.style.transform || 'none' }], { duration: 620, easing: 'cubic-bezier(.2,.8,.2,1)' });
         } else old.remove();
       }
-      if (anim && how === 'fade') sheet.animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      if (anim && how === 'fade') sheet.animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: sheet.style.transform || 'none' }], { duration: 320, easing: 'cubic-bezier(.2,.8,.2,1)' });
     }
     function freshSheet() { clearTimeout(nextT); hue = (hue + 1) % SHEETS.length; newSheet('slide'); }
     function popSound() {
@@ -173,38 +202,45 @@ registerToy('patlat', {
       if (!SIZES[k] || k === size) return;
       size = k; store.set(K_SIZE, size);
       $$('[data-size]', el).forEach(b => b.setAttribute('aria-pressed', b.dataset.size === k));
+      if (count && popped === count) hue = (hue + 1) % SHEETS.length;   // the finished sheet's replacement still gets the next colour
       clearTimeout(nextT);
       if (dirty) { store.set('pt-total', total); dirty = 0; }
       newSheet('fade');
     }
     frame.addEventListener('pointerdown', e => {
       if (e.button > 0 || !sheet || !sheet.contains(e.target)) return;
-      down = e.pointerId; try { frame.setPointerCapture(e.pointerId); } catch (err) {}
+      downs.add(e.pointerId); try { frame.setPointerCapture(e.pointerId); } catch (err) {}
       popAt(e.clientX, e.clientY);
     });
     frame.addEventListener('pointermove', e => {
-      if (down !== e.pointerId) return;
+      if (!downs.has(e.pointerId)) return;
       const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
       (evs.length ? evs : [e]).forEach(ev => popAt(ev.clientX, ev.clientY));
     });
-    const up = e => { if (down === e.pointerId) down = null; };
-    frame.addEventListener('pointerup', up); frame.addEventListener('pointercancel', up);
+    const up = e => { downs.delete(e.pointerId); };
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => frame.addEventListener(t, up));
     $('#pt-new', el).addEventListener('click', () => { store.set('pt-total', total); dirty = 0; freshSheet(); });
     sizeEl.addEventListener('click', e => { const b = e.target.closest('[data-size]'); if (b) setSize(b.dataset.size); });
-    /* Width changes: an untouched sheet is rebuilt to fit; a sheet in progress is scaled down rather than losing its pops. */
+    /* A mouse click must not leave focus on a control, so Space and N keep working as shortcuts afterwards. */
+    el.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+    const onPointer = () => { tabbed = false; };
+    document.addEventListener('pointerdown', onPointer, true);
+    /* Size changes: an untouched sheet is rebuilt to fit; a sheet in progress is scaled rather than losing its pops. */
     let ro = null, raf = 0;
     const fit = () => {
       if (!sheet) return;
-      const W = frame.clientWidth;
-      if (popped === 0 && Math.abs(W - w0) > 2) { newSheet('none'); return; }
-      sheet.style.transform = sheetW > W + 0.5 ? `scale(${W / sheetW})` : '';
+      if (popped === 0 && (Math.abs(frame.clientWidth - w0) > 2 || Math.abs(availH() - h0) > 2)) { newSheet('none'); return; }
+      scaleToFit();
     };
     if ('ResizeObserver' in window) ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fit); });
     newSheet('none');
-    if (ro) ro.observe(frame);
+    if (ro) { ro.observe(frame); ro.observe(body); }
     return {
       onKey(e) {
         if (isField(e.target)) return;
+        if (e.key === 'Tab') { tabbed = true; return; }
+        const ctl = e.target && e.target.closest ? e.target.closest('button, a[href]') : null;
+        if (ctl && (e.key === ' ' || e.key === 'Enter') && (tabbed || el.contains(ctl))) return;   // a control reached with Tab gets its own Space / Enter
         const k = e.key.toLocaleLowerCase('tr');
         if (e.key === ' ') {
           e.preventDefault();
@@ -213,7 +249,7 @@ registerToy('patlat', {
         } else if (k === 'n' && !e.repeat) { e.preventDefault(); store.set('pt-total', total); dirty = 0; freshSheet(); }
         else if (/^[1-3]$/.test(e.key) && !e.repeat) { e.preventDefault(); setSize(SIZE_IDS[+e.key - 1]); }
       },
-      destroy() { store.set('pt-total', total); clearTimeout(nextT); if (ro) ro.disconnect(); cancelAnimationFrame(raf); },
+      destroy() { store.set('pt-total', total); clearTimeout(nextT); if (ro) ro.disconnect(); cancelAnimationFrame(raf); document.removeEventListener('pointerdown', onPointer, true); },
     };
   },
 });

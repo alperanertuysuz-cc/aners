@@ -71,7 +71,7 @@ registerToy('melodi', {
     const s = store.get('melodi', null);
     if (!s || !Array.isArray(s.p) || !s.p.some(Boolean)) return 'Pentatonik · 3 ses';
     const bpm = clamp(Math.round(+s.bpm) || 96, BPM_MIN, BPM_MAX);
-    return `${PRESETS[s.preset] ? PRESETS[s.preset].name : 'Kendi melodin'} · ${bpm} BPM`;
+    return `${PRESETS[s.preset] ? PRESETS[s.preset].name : 'Melodin'} · ${bpm} BPM`;
   },
   css: `
 .art-melodi { --u: 18px; position: relative; display: grid; grid-template-columns: repeat(8, var(--u)); grid-auto-rows: var(--u); gap: 2px; }
@@ -86,7 +86,7 @@ registerToy('melodi', {
 @keyframes ml-art { 0% { transform: scale(1); } 3% { transform: scale(1.32); background: var(--paper); } 13%, 100% { transform: scale(1); background: var(--on-light); } }
 @media (min-width: 961px) { .art-melodi { --u: 21px; gap: 3px; } }
 
-.melodi-root { --s: 40px; --g: 5px; --lw: 30px; --bp: 12px; gap: clamp(12px, 2.1vh, 22px); user-select: none; -webkit-user-select: none; }
+.melodi-root { --s: 40px; --g: 5px; --lw: 30px; --bp: 12px; gap: clamp(12px, 2.1vh, 22px); user-select: none; -webkit-user-select: none; touch-action: manipulation; }
 .melodi-root .ml-w { width: max(var(--bw, 100%), min(100%, 300px)); max-width: 100%; }
 .melodi-root .ml-top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
 .melodi-root .ml-play {
@@ -179,6 +179,22 @@ registerToy('melodi', {
 .melodi-root.narrow .ml-btns .btn { flex: 1; padding: 0 14px; }
 .melodi-root.narrow .ml-presets { flex: 1 1 100%; justify-content: center; }
 @media (max-width: 359px) { .melodi-root .ml-echo svg { display: none; } .melodi-root .ml-play { width: 52px; height: 52px; } }
+@media (pointer: coarse) {
+  .melodi-root .seg { gap: 2px; padding: 2px; }
+  .melodi-root .seg button { min-height: 44px; }
+  .melodi-root .chip { height: 44px; }
+  .melodi-root .ml-pages { gap: 3px; padding: 3px; }
+  .melodi-root .ml-pg { height: 44px; }
+}
+/* Short and wide (a phone on its side): controls in a column beside the board, so the whole board and the play button share the screen. */
+.melodi-root.side {
+  display: grid; grid-template-columns: var(--cw, 300px) auto; grid-template-rows: auto auto auto minmax(0, 1fr);
+  column-gap: var(--cg, 24px); row-gap: min(14px, 2.6vh); justify-content: center; align-items: start;
+}
+.melodi-root.side > .ml-w { grid-column: 1; width: auto; }
+.melodi-root.side .ml-board { grid-column: 2; grid-row: 1 / -1; }
+.melodi-root.side .ml-actions { grid-row: -2 / -1; align-self: end; row-gap: 12px; }
+.melodi-root.side .ml-top { gap: 12px 14px; }
 `,
   hint: 'Boşluk çal / durdur · R rastgele · 1 2 3 ses',
   mount(el) {
@@ -189,7 +205,7 @@ registerToy('melodi', {
     el.innerHTML = `
       <div class="toy melodi-root">
         <div class="ml-top ml-w">
-          <span class="ml-pw"><i class="ml-pulse" id="ml-pulse" aria-hidden="true"></i><button type="button" class="ml-play" id="ml-play" aria-pressed="false" aria-label="Çal">${ICON.play}</button></span>
+          <span class="ml-pw"><i class="ml-pulse" id="ml-pulse" aria-hidden="true"></i><button type="button" class="ml-play" id="ml-play" aria-label="Çal">${ICON.play}</button></span>
           <div class="ml-knob"><div class="ml-knob-top"><label class="mono" for="ml-bpm">Tempo</label><output class="mono" id="ml-bpm-o" for="ml-bpm"></output></div><input type="range" id="ml-bpm" min="${BPM_MIN}" max="${BPM_MAX}" step="1"></div>
           <div class="ml-sound">
             <div class="seg" role="group" aria-label="Ses">${SND.map(k => `<button type="button" data-snd="${k}" aria-pressed="${k === snd}">${SOUNDS[k]}</button>`).join('')}</div>
@@ -329,29 +345,40 @@ registerToy('melodi', {
       const cs = getComputedStyle(el);
       const W = Math.min(1100, el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
       const H = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-      const narrow = W < 600;
+      const side = W >= 600 && H < 560;                // stacked, ten rows of ≥32px would not fit: put the controls beside the board
+      const narrow = W < 600 || side;
       if (narrow !== rootEl.classList.contains('narrow')) {
         rootEl.classList.toggle('narrow', narrow);
         if (narrow) { soundEl.classList.add('ml-w'); actionsEl.before(soundEl); } else { soundEl.classList.remove('ml-w'); topEl.append(soundEl); }
       }
-      G = W < 600 ? 4 : 6;
-      LW = W < 330 ? 0 : W < 600 ? 24 : 30;
-      const BP = W < 600 ? 8 : 14;
-      const inner = W - BP * 2 - (LW ? LW + G : 0);
+      rootEl.classList.toggle('side', side);
+      const CW = side ? clamp(Math.round(W * 0.34), 290, 330) : 0, CG = side ? clamp(Math.round(W * 0.03), 18, 32) : 0;
+      const BW = W - CW - CG;                           // room for the board
+      G = BW < 600 ? 4 : 6;
+      LW = BW < 330 ? 0 : BW < 600 ? 24 : 30;
+      const BP = BW < 600 ? 8 : 14;
+      const inner = BW - BP * 2 - (LW ? LW + G : 0);
       const s16 = (inner - 15 * G) / 16;
-      const nv = s16 >= 34 ? 16 : 8;
+      const sFit = (H - BP * 2 - 9 * G) / 10;           // side: the board alone fills the height (the playhead column shows the step)
+      const nv = s16 >= (side ? Math.min(34, sFit) : 34) ? 16 : 8;
       if (nv !== view) setView(nv);
+      leds.hidden = nv === 8 || side;
       const sW = nv === 16 ? s16 : (inner - 7 * G) / 8;
       rootEl.style.setProperty('--g', G + 'px'); rootEl.style.setProperty('--bp', BP + 'px');
+      rootEl.style.setProperty('--cw', CW + 'px'); rootEl.style.setProperty('--cg', CG + 'px');
       grid.classList.toggle('nolab', !LW); leds.classList.toggle('nolab', !LW);
-      const ledH = nv === 16 ? leds.offsetHeight + 10 : 0;
-      const tr = rootEl.getBoundingClientRect(), br = board.getBoundingClientRect();
-      const other = rootEl.offsetHeight - board.offsetHeight;
-      const chrome = BP * 2 + ledH + 9 * G;
-      const sAll = (H - other - chrome) / 10, sTop = (H - (br.top - tr.top) - chrome) / 10;
-      const minS = W < 340 ? 28 : 32;
-      let s = Math.min(sW, 58, sAll >= minS ? sAll : Math.max(minS, sTop));
-      S = Math.max(20, Math.floor(s));
+      let s;
+      if (side) s = Math.min(sW, 58, sFit);
+      else {
+        const ledH = nv === 16 ? leds.offsetHeight + 10 : 0;
+        const tr = rootEl.getBoundingClientRect(), br = board.getBoundingClientRect();
+        const other = rootEl.offsetHeight - board.offsetHeight;
+        const chrome = BP * 2 + ledH + 9 * G;
+        const sAll = (H - other - chrome) / 10, sTop = (H - (br.top - tr.top) - chrome) / 10;
+        const minS = W < 340 ? 28 : 32;
+        s = Math.min(sW, 58, sAll >= minS ? sAll : Math.max(minS, sTop));
+      }
+      S = Math.max(side ? 16 : 20, Math.floor(s));
       const cols = (LW ? LW + 'px ' : '') + `repeat(${nv}, ${S}px)`;
       grid.style.gridTemplateColumns = cols; leds.style.gridTemplateColumns = (LW ? LW + 'px ' : '') + `repeat(16, ${S}px)`;
       rootEl.style.setProperty('--s', S + 'px');
@@ -417,7 +444,7 @@ registerToy('melodi', {
       timer = setTimeout(scheduler, 25);
     }
     function frame() {
-      const now = Sound.ctx.currentTime; let s = -1;
+      const ctx = Sound.ctx, now = ctx.currentTime - clamp((ctx.outputLatency || 0) + (ctx.baseLatency || 0), 0, 0.3); let s = -1;
       while (queue.length && queue[0].t <= now) s = queue.shift().s;
       if (s >= 0) light(s);
       raf = requestAnimationFrame(frame);
@@ -428,11 +455,11 @@ registerToy('melodi', {
       if (!ctx) { say('Bu tarayıcı ses üretemiyor.'); return; }
       playing = true; follow = true; cur = 0; queue = []; nextT = ctx.currentTime + 0.06;
       scheduler(); raf = requestAnimationFrame(frame);
-      playBtn.setAttribute('aria-pressed', 'true'); playBtn.setAttribute('aria-label', 'Durdur'); playBtn.innerHTML = ICON.stop;
+      playBtn.setAttribute('aria-label', 'Durdur'); playBtn.innerHTML = ICON.stop;
     }
     function stop() {
       playing = false; clearTimeout(timer); cancelAnimationFrame(raf); queue = []; light(-1);
-      playBtn.setAttribute('aria-pressed', 'false'); playBtn.setAttribute('aria-label', 'Çal'); playBtn.innerHTML = ICON.play;
+      playBtn.setAttribute('aria-label', 'Çal'); playBtn.innerHTML = ICON.play;
     }
     const toggle = () => (playing ? stop() : play());
 

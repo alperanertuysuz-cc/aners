@@ -5,6 +5,7 @@
   --panel: #F4F4F5;
   --panel-2: #D9DADD;
   --panel-3: #CBCCD0;
+  --raised: #FFFFFF;
   --fg: #16171A;
   --mute: #5B5E66;
   --line: rgba(22, 23, 26, .12);
@@ -48,7 +49,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #101113; --panel: #1B1C1F; --panel-2: #26272B; --panel-3: #33343A;
+    --bg: #101113; --panel: #1B1C1F; --panel-2: #26272B; --panel-3: #33343A; --raised: #3D3E45;
     --fg: #EDEEF0; --mute: #9A9DA5; --line: rgba(255, 255, 255, .09); --line-2: rgba(255, 255, 255, .2); --shade: rgba(0, 0, 0, .65);
     --ink-tile: #EDEEF0; --ink-tile-fg: #16171A; --bad: #FF6469;
     --g2: #2A2B30; --g4: #36383F;
@@ -56,7 +57,7 @@
   }
 }
 :root[data-theme="dark"] {
-  --bg: #101113; --panel: #1B1C1F; --panel-2: #26272B; --panel-3: #33343A;
+  --bg: #101113; --panel: #1B1C1F; --panel-2: #26272B; --panel-3: #33343A; --raised: #3D3E45;
   --fg: #EDEEF0; --mute: #9A9DA5; --line: rgba(255, 255, 255, .09); --line-2: rgba(255, 255, 255, .2); --shade: rgba(0, 0, 0, .65);
   --ink-tile: #EDEEF0; --ink-tile-fg: #16171A; --bad: #FF6469;
   --g2: #2A2B30; --g4: #36383F;
@@ -114,7 +115,9 @@ kbd {
 .seg { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 3px; padding: 4px; border-radius: 22px; background: var(--panel-2); }
 .seg button { min-height: 36px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--mute); transition: background .2s, color .2s; }
 .seg button:hover { color: var(--fg); }
-.seg button[aria-pressed="true"] { background: var(--panel); color: var(--fg); box-shadow: 0 1px 3px var(--shade); }
+.seg button { position: relative; }
+.seg button::after { content: ""; position: absolute; inset: -4px -1.5px; }
+.seg button[aria-pressed="true"] { background: var(--raised); color: var(--fg); box-shadow: 0 1px 3px var(--shade); }
 .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .chip {
   display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 999px;
@@ -228,7 +231,7 @@ input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; border: 0; bo
   padding: calc(env(safe-area-inset-top, 0px) + 12px) var(--gutter) 12px; border-bottom: 1px solid var(--line);
 }
 .back {
-  display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px 0 10px; border-radius: 999px; flex: none;
+  display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px 0 10px; border-radius: 999px; flex: none;
   background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); font-size: 15px; font-weight: 600;
   transition: background .2s, transform .3s var(--spring);
 }

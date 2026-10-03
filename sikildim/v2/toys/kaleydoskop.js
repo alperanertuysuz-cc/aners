@@ -18,6 +18,7 @@ const BRUSH_IDS = Object.keys(BRUSHES);
 const MAX_UNDO = 12;
 const MAX_PX = 1600;                      // canvas backing store cap (keeps 12 undo snapshots affordable)
 const BG = '#0E0F12';                     // = --canvas, same in both themes
+const GLOW = [[3.4, 0.3], [2.3, 0.6], [1.5, 1]];   // glow bands: [width × brush, brightness]
 /* Side-by-side layout (canvas left, tools right). FULL adds labels, the swatch row and key hints. Keep in sync with the CSS below. */
 const FULL_Q = '(min-width: 980px) and (min-height: 600px)';
 const SIDE_Q = `${FULL_Q}, (orientation: landscape) and (max-height: 599px) and (min-width: 600px)`;
@@ -61,7 +62,7 @@ registerToy('kaleydoskop', {
 .kal-mini i:nth-child(3) { inset: 40%; background: var(--on-light); }
 .tile:hover .kal-mini { transform: rotate(60deg); }
 
-.kal-root { --s: 320px; --pw: 340px; gap: clamp(12px, 2vh, 18px); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.kal-root { --s: 320px; --pw: 340px; gap: clamp(12px, 2vh, 18px); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .kal-root svg { width: 20px; height: 20px; flex: none; }
 .kal-root kbd { display: none; }
 
@@ -188,7 +189,7 @@ registerToy('kaleydoskop', {
           <button type="button" class="kal-ib" data-act="clear" aria-label="Temizle" title="Temizle" disabled>${CLEAR_SVG}<span class="kal-t">Temizle</span><kbd>C</kbd></button>
           <span class="kal-sp" aria-hidden="true"></span>
           <button type="button" class="chip kal-auto" data-act="auto" aria-pressed="false" aria-label="Kendiliğinden" title="Kendiliğinden çizsin"><span class="kal-ai">${ICON.play}</span><span class="kal-t">Kendiliğinden</span><kbd>O</kbd></button>
-          <button type="button" class="btn kal-save" data-act="save" disabled>${SAVE_SVG}<span>Kaydet</span><kbd>S</kbd></button>
+          <button type="button" class="btn kal-save" data-act="save" aria-label="Kaydet" disabled>${SAVE_SVG}<span>Kaydet</span><kbd>S</kbd></button>
         </div>
         <div class="kal-stage" id="kal-stage">
           <canvas id="kal-cv" role="img" aria-label="Kaleydoskop çizim alanı"></canvas>
@@ -230,13 +231,15 @@ registerToy('kaleydoskop', {
     function setPal() { rgb = PALETTES[palKey].c.map(parse); }
     function colorAt(t) {
       const n = rgb.length, x = ((t % 1) + 1) % 1 * n, i = Math.floor(x), f = x - i, a = rgb[i], b = rgb[(i + 1) % n];
-      return `rgb(${Math.round(a[0] + (b[0] - a[0]) * f)},${Math.round(a[1] + (b[1] - a[1]) * f)},${Math.round(a[2] + (b[2] - a[2]) * f)})`;
+      return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
     }
 
     /* ---------- canvas ---------- */
     function paintBg() { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.fillStyle = BG; g.fillRect(0, 0, cv.width, cv.height); g.restore(); }
     function resize(s) {
       if (Math.abs(s - size) < 2 && cv.width) return;
+      const relayer = !!(lay && lay.on);     // mid-stroke: flatten, rescale, then keep drawing on fresh layers
+      if (relayer) layerEnd();
       let tmp = null;
       if (size && cv.width) { tmp = document.createElement('canvas'); tmp.width = cv.width; tmp.height = cv.height; tmp.getContext('2d').drawImage(cv, 0, 0); }
       const old = size;
@@ -246,20 +249,50 @@ registerToy('kaleydoskop', {
       if (tmp) { g.drawImage(tmp, 0, 0, s, s); tmp.width = tmp.height = 0; }
       if (pen && old) { pen.x *= s / old; pen.y *= s / old; pen.w *= s / old; }
       autoPen = null; ver++;
+      if (relayer) layerBegin();
     }
     function markDirty() { ver++; if (!dirty) { dirty = true; syncBtns(); } }
+    /* Stroke layers. The stroke in progress (or the auto pen) is drawn opaque onto its own glow and core layers, which are then
+       screened over a copy of the canvas from before the stroke. Overlapping segment caps no longer stack up into a bead chain,
+       while separate strokes still glow where they cross. */
+    let lay = null;
+    const mkCv = () => { const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; return c; };
+    function layerFree() { if (lay) { [lay.base, lay.halo, lay.core].forEach(c => { c.width = c.height = 0; }); lay = null; } }
+    function layerBegin() {
+      if (!lay || lay.base.width !== cv.width || lay.base.height !== cv.height) {
+        layerFree();
+        const base = mkCv(), halo = mkCv(), core = mkCv();
+        lay = { base, halo, core, bg: base.getContext('2d'), hg: halo.getContext('2d'), cg: core.getContext('2d'), on: false, fresh: false };
+      }
+      lay.bg.setTransform(1, 0, 0, 1, 0, 0); lay.bg.globalCompositeOperation = 'source-over'; lay.bg.globalAlpha = 1; lay.bg.drawImage(cv, 0, 0);   // cv is opaque: a plain copy
+      [lay.hg, lay.cg].forEach(x => { x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.clearRect(0, 0, cv.width, cv.height); x.setTransform(dpr, 0, 0, dpr, 0, 0); });
+      lay.on = true; lay.fresh = false;
+    }
+    function layerEnd() { if (lay && lay.on) { compose(); lay.on = false; } }
+    function compose() {
+      if (!lay || !lay.on || !lay.fresh) return;
+      lay.fresh = false;
+      g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.drawImage(lay.base, 0, 0);
+      g.globalCompositeOperation = 'screen'; g.globalAlpha = 0.24; g.drawImage(lay.halo, 0, 0);
+      g.globalAlpha = 0.95; g.drawImage(lay.core, 0, 0);
+      g.restore();
+    }
     function draw(x0, y0, x1, y1, w, col) {
-      const c = size / 2;
-      g.save(); g.translate(c, c); g.globalCompositeOperation = 'screen'; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = col;
-      g.beginPath();
+      const c = size / 2, path = new Path2D();
       for (let k = 0; k < sym; k++) {
         const a = k * TAU / sym, ca = Math.cos(a), sa = Math.sin(a);
-        g.moveTo(x0 * ca - y0 * sa, x0 * sa + y0 * ca); g.lineTo(x1 * ca - y1 * sa, x1 * sa + y1 * ca);
-        if (mirror) { g.moveTo(x0 * ca + y0 * sa, x0 * sa - y0 * ca); g.lineTo(x1 * ca + y1 * sa, x1 * sa - y1 * ca); }
+        path.moveTo(x0 * ca - y0 * sa, x0 * sa + y0 * ca); path.lineTo(x1 * ca - y1 * sa, x1 * sa + y1 * ca);
+        if (mirror) { path.moveTo(x0 * ca + y0 * sa, x0 * sa - y0 * ca); path.lineTo(x1 * ca + y1 * sa, x1 * sa - y1 * ca); }
       }
-      g.globalAlpha = 0.13; g.lineWidth = w * 2.8; g.stroke();
-      g.globalAlpha = 0.95; g.lineWidth = w; g.stroke();
-      g.restore();
+      const css = k => `rgb(${Math.round(col[0] * k)},${Math.round(col[1] * k)},${Math.round(col[2] * k)})`;
+      const pass = (x, mode, alpha, lw, k) => {
+        x.save(); x.translate(c, c); x.globalCompositeOperation = mode; x.globalAlpha = alpha;
+        x.lineCap = 'round'; x.lineJoin = 'round'; x.strokeStyle = css(k); x.lineWidth = lw; x.stroke(path); x.restore();
+      };
+      /* Glow: three opaque bands, dimmer toward the edge; 'lighten' keeps the brightest band, so overlaps never build up. */
+      if (lay && lay.on) { GLOW.forEach(([m, k]) => pass(lay.hg, 'lighten', 1, w * m, k)); pass(lay.cg, 'source-over', 1, w, 1); lay.fresh = true; }
+      else { pass(g, 'screen', 0.13, w * 2.8, 1); pass(g, 'screen', 0.95, w, 1); }
       markDirty();
     }
     /* Faster strokes get thinner; the brush scales the whole range. */
@@ -287,6 +320,7 @@ registerToy('kaleydoskop', {
     function undo() {
       if (!hist.length) return false;
       finishClear(); stopAuto(); pen = null;
+      if (lay) lay.on = false;                  // a stroke still in progress is dropped, not flattened
       const h = hist.pop();
       g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
       g.drawImage(h.c, 0, 0, cv.width, cv.height); g.restore();
@@ -296,13 +330,21 @@ registerToy('kaleydoskop', {
       say(hist.length ? 'Geri alındı' : 'Geri alındı, başa dönüldü');
       return true;
     }
-    function finishClear() { if (clearT) { clearTimeout(clearT); clearT = 0; paintBg(); cv.style.opacity = 1; } }
+    /* Blank canvas; the auto pen may keep drawing, so its layers start over too. */
+    function wipe() {
+      paintBg();
+      if (lay && lay.on) {
+        lay.bg.drawImage(cv, 0, 0);
+        [lay.hg, lay.cg].forEach(x => { x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, cv.width, cv.height); x.restore(); });
+      }
+    }
+    function finishClear() { if (clearT) { clearTimeout(clearT); clearT = 0; wipe(); cv.style.opacity = 1; } }
     function clear() {
       finishClear();
       if (!dirty) return;
       snap(); dirty = false; ver++; syncBtns(); vibrate(10); say('Temizlendi');
-      if (motionOK()) { cv.style.opacity = 0; clearT = setTimeout(() => { clearT = 0; paintBg(); cv.style.opacity = 1; }, 220); }
-      else paintBg();
+      if (motionOK()) { cv.style.opacity = 0; clearT = setTimeout(() => { clearT = 0; wipe(); cv.style.opacity = 1; }, 220); }
+      else wipe();
     }
     function syncBtns() {
       undoBtn.disabled = !hist.length;
@@ -311,18 +353,36 @@ registerToy('kaleydoskop', {
     }
 
     /* ---------- auto mode ---------- */
-    function fadeStep() { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.fillStyle = 'rgba(14,15,18,0.035)'; g.fillRect(0, 0, cv.width, cv.height); g.restore(); }
+    /* Older lines sink back into the dark (every 4th frame, by 5%: ~1 s half-life). Scaling toward black keeps their hue
+       (an 8-bit fade toward the background colour drifts teal and leaves ghosts) and 'lighten' with the background stops the
+       base from going darker than the canvas. The layers fade at the same rate and are folded into the base every 2 s. */
+    function fadeStep() {
+      if (!lay || !lay.on) return;
+      const b = lay.bg;
+      b.fillStyle = 'rgba(0,0,0,0.05)'; b.fillRect(0, 0, cv.width, cv.height);
+      b.globalCompositeOperation = 'lighten'; b.fillStyle = BG; b.fillRect(0, 0, cv.width, cv.height);
+      b.globalCompositeOperation = 'source-over';
+      [lay.hg, lay.cg].forEach(x => {
+        x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'destination-out'; x.fillStyle = 'rgba(0,0,0,0.05)';
+        x.fillRect(0, 0, cv.width, cv.height); x.restore();
+      });
+      lay.fresh = true;
+    }
     function startAuto(fade) {
       stopAuto(); auto = true; autoBtn.setAttribute('aria-pressed', 'true'); $('.kal-ai', autoBtn).innerHTML = ICON.stop;
+      layerBegin();
       seed = Array.from({ length: 4 }, () => rand(0, TAU)); autoPen = null;
       const t0 = performance.now();
+      let frames = 0;
       const loop = now => {
         const t = (now - t0) / 1000, R = size * 0.46;
         const r = R * (0.3 + 0.64 * (0.5 + 0.5 * Math.sin(t * 1.25 + seed[0])) * (0.75 + 0.25 * Math.sin(t * 0.41 + seed[1])));
         const a = seed[3] + t * 1.05 + 0.8 * Math.sin(t * 0.6 + seed[2]);
         const x = size / 2 + r * Math.cos(a), y = size / 2 + r * Math.sin(a);
+        if (fade && frames % 4 === 0) fadeStep();
         if (!autoPen) autoPen = { x, y, w: 2.5 * size / 600 * BRUSHES[brush].k, max: 5.5 }; else seg(autoPen, x, y);
-        if (fade) fadeStep();
+        compose();
+        if (fade && ++frames % 120 === 0) layerBegin();     // fold the newest lines into the fading base
         raf = requestAnimationFrame(loop);
       };
       raf = requestAnimationFrame(loop);
@@ -330,7 +390,7 @@ registerToy('kaleydoskop', {
     function stopAuto() {
       clearTimeout(demoT);
       if (!auto) return;
-      auto = false; cancelAnimationFrame(raf);
+      auto = false; cancelAnimationFrame(raf); layerEnd();
       autoBtn.setAttribute('aria-pressed', 'false'); $('.kal-ai', autoBtn).innerHTML = ICON.play;
       prep();
     }
@@ -416,17 +476,19 @@ registerToy('kaleydoskop', {
       if (e.button > 0 || pen) return;
       e.preventDefault();
       stopAuto(); finishClear(); hideHint(); clearTimeout(prepT);
-      snap();
+      snap(); layerBegin();
       try { cv.setPointerCapture(e.pointerId); } catch (err) {}
       const p = pt(e); pen = { id: e.pointerId, x: p.x, y: p.y, w: 5 * size / 600 * BRUSHES[brush].k };
       seg({ x: p.x - 1, y: p.y, w: pen.w }, p.x, p.y);
+      compose();
     }
     function onMove(e) {
       if (!pen || e.pointerId !== pen.id) return;
       const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
       (evs.length ? evs : [e]).forEach(ev => { const p = pt(ev); seg(pen, p.x, p.y); });
+      compose();
     }
-    function onUp(e) { if (pen && e.pointerId === pen.id) { pen = null; prep(); } }
+    function onUp(e) { if (pen && e.pointerId === pen.id) { pen = null; layerEnd(); prep(); } }
     cv.addEventListener('pointerdown', onDown);
     cv.addEventListener('pointermove', onMove);
     cv.addEventListener('pointerup', onUp);
@@ -510,7 +572,7 @@ registerToy('kaleydoskop', {
         if (ro) ro.disconnect(); cancelAnimationFrame(rraf);
         if (sideMQ.removeEventListener) sideMQ.removeEventListener('change', onMQ);
         if (document.fonts && document.fonts.removeEventListener) document.fonts.removeEventListener('loadingdone', onFonts);
-        hist.forEach(h => { h.c.width = h.c.height = 0; }); hist.length = 0;
+        hist.forEach(h => { h.c.width = h.c.height = 0; }); hist.length = 0; layerFree();
         blobP = null;
       },
     };

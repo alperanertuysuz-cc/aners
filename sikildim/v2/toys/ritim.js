@@ -44,18 +44,21 @@ function mkSlot(o) {
 const presetSlot = (k, kit) => mkSlot({ bpm: PRESETS[k].bpm, swing: PRESETS[k].swing, kit, preset: k, p: PRESETS[k].p });
 const cloneSlot = s => ({ ...s, p: Object.fromEntries(IDS.map(id => [id, s.p[id].slice()])) });
 const v1Shape = s => ({ bpm: s.bpm, swing: s.swing, preset: V1_PRESETS.includes(s.preset) ? s.preset : null, p: Object.fromEntries(IDS.map(id => [id, s.p[id].map(Number)])) });
+const fromV1 = (v1, kit) => mkSlot({ bpm: v1.bpm || 90, swing: v1.swing != null ? v1.swing : 30, kit, preset: v1.preset, p: v1.p });
 function load() {
-  const r2 = store.get('ritim2', null);
+  const r2 = store.get('ritim2', null), v1 = store.get('ritim', null);
+  const hasV1 = v1 && typeof v1 === 'object' && v1.p && typeof v1.p === 'object';
   if (r2 && typeof r2 === 'object' && Array.isArray(r2.slots) && r2.slots.length === 4) {
-    return {
-      fresh: false, cur: clamp(r2.cur | 0, 0, 3), slots: r2.slots.map(mkSlot),
-      mute: new Set((Array.isArray(r2.mute) ? r2.mute : []).filter(id => IDS.includes(id))),
-    };
+    const slots = r2.slots.map(mkSlot);
+    /* V2 mirrors slot A into V1's key on every save, so a difference means the old site edited the beat later: the newest edit wins. */
+    let fresh = false;
+    if (hasV1) {
+      const a = fromV1(v1, slots[0].kit);
+      if (JSON.stringify(v1Shape(a)) !== JSON.stringify(v1Shape(slots[0]))) { slots[0] = a; fresh = true; }
+    }
+    return { fresh, cur: clamp(r2.cur | 0, 0, 3), slots, mute: new Set((Array.isArray(r2.mute) ? r2.mute : []).filter(id => IDS.includes(id))) };
   }
-  const v1 = store.get('ritim', null);
-  const a = v1 && typeof v1 === 'object' && v1.p
-    ? mkSlot({ bpm: v1.bpm || 90, swing: v1.swing != null ? v1.swing : 30, kit: 'klasik', preset: v1.preset, p: v1.p })
-    : presetSlot('boombap', 'klasik');
+  const a = hasV1 ? fromV1(v1, 'klasik') : presetSlot('boombap', 'klasik');
   return { fresh: true, cur: 0, mute: new Set(), slots: [a, presetSlot('rock', 'akustik'), presetSlot('gece', 'lofi'), mkSlot({ bpm: 120, swing: 0, kit: 'klasik' })] };
 }
 
@@ -160,11 +163,9 @@ registerToy('ritim', {
   desc: 'Üç ses kiti, dört desen slotu. Kendi beat’ini kur ya da zar at.',
   art: ART,
   stat: () => {
-    const r2 = store.get('ritim2', null);
-    const s = r2 && Array.isArray(r2.slots) ? r2.slots[clamp(r2.cur | 0, 0, 3)] : null;
-    if (s && typeof s === 'object') return `${String(KITS[s.kit] || 'Klasik').replace(/^Lo-fi$/i, 'LO-FI')} · ${clamp(Math.round(+s.bpm) || 100, BPM_MIN, BPM_MAX)} BPM`;
-    const rt = store.get('ritim', null);
-    return rt && rt.bpm ? `Klasik · ${clamp(Math.round(+rt.bpm) || 90, BPM_MIN, BPM_MAX)} BPM` : '3 kit · 4 slot · 16 adım';
+    if (store.get('ritim2', null) == null && store.get('ritim', null) == null) return '3 kit · 4 slot · 16 adım';
+    const st = load(), s = st.slots[st.cur];            // same view the toy opens with (incl. a newer V1 edit)
+    return `${s.kit === 'lofi' ? 'LO-FI' : KITS[s.kit]} · ${s.bpm} BPM`;
   },
   css: `
 .art-ritim { position: relative; display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; width: min(100%, 200px); }
@@ -209,7 +210,7 @@ registerToy('ritim', {
 .ritim-root .rt-copy:active { transform: scale(.94); }
 .ritim-root .rt-copy svg { width: 18px; height: 18px; flex: none; }
 .ritim-root .rt-copy[aria-pressed="true"] { background: var(--fg); color: var(--bg); box-shadow: none; }
-@media (hover: hover) { .ritim-root .rt-copy:hover { color: var(--fg); } .ritim-root .rt-slot:not([aria-pressed="true"]):hover { box-shadow: inset 0 0 0 2px var(--line-2); } }
+@media (hover: hover) { .ritim-root .rt-copy:not([aria-pressed="true"]):hover { color: var(--fg); } .ritim-root .rt-slot:not([aria-pressed="true"]):hover { box-shadow: inset 0 0 0 2px var(--line-2); } }
 .ritim-root .rt-kit { flex-wrap: nowrap; }
 .ritim-root .rt-knobs { display: flex; flex: 1 1 280px; gap: 12px 20px; min-width: 0; }
 .ritim-root .rt-knob { flex: 1 1 0; display: grid; gap: 2px; min-width: 0; }
@@ -311,6 +312,8 @@ registerToy('ritim', {
 .ritim-root.rt-paged .rt-clear { min-width: 92px; }
 .ritim-root.rt-paged .rt-pbtn { display: inline-flex; }
 .ritim-root.rt-paged .rt-presets, .ritim-root.rt-paged .rt-note { display: none; }
+.ritim-root .rt-note-t { display: none; }
+@media (hover: none) and (pointer: coarse) { .ritim-root .rt-note-k { display: none; } .ritim-root .rt-note-t { display: inline; } }
 @media (max-width: 359px) {
   .ritim-root.rt-paged .rt-play { width: 68px; height: 68px; }
   .ritim-root.rt-paged .rt-transport { gap: 8px 10px; }
@@ -353,15 +356,16 @@ registerToy('ritim', {
     const st = load();
     const slots = st.slots, mute = st.mute;
     let cur = st.cur;
-    const hadV1 = store.get('ritim', null) != null;
+    let hadV1 = store.get('ritim', null) != null;
     const a0 = JSON.stringify(v1Shape(slots[0]));
     function save() {
       store.set('ritim2', {
         v: 1, cur, mute: IDS.filter(id => mute.has(id)),
         slots: slots.map(s => ({ bpm: s.bpm, swing: s.swing, kit: s.kit, preset: s.preset, name: s.name, p: Object.fromEntries(IDS.map(id => [id, encRow(s.p[id])])) })),
       });
-      const v = v1Shape(slots[0]);            // keep V1 in step with slot A, but never create its key for nothing
-      if (hadV1 || JSON.stringify(v) !== a0) store.set('ritim', v);
+      /* keep V1 in step with slot A, but never create its key for nothing; once written, keep it current */
+      const v = v1Shape(slots[0]);
+      if (hadV1 || JSON.stringify(v) !== a0) { store.set('ritim', v); hadV1 = true; }
     }
 
     el.innerHTML = `
@@ -376,7 +380,7 @@ registerToy('ritim', {
             <div class="seg rt-kit" role="group" aria-label="Ses kiti">${KIT_IDS.map(k => `<button type="button" data-kit="${k}" aria-pressed="false">${KITS[k]}</button>`).join('')}</div>
             <div class="rt-knobs">
               <div class="rt-knob"><div class="rt-knob-top"><label class="mono" for="rt-bpm">Tempo</label><output class="mono" id="rt-bpm-o" for="rt-bpm"></output></div><input type="range" id="rt-bpm" min="${BPM_MIN}" max="${BPM_MAX}" step="1"></div>
-              <div class="rt-knob"><div class="rt-knob-top"><label class="mono" for="rt-swing">Swing</label><output class="mono" id="rt-swing-o" for="rt-swing"></output></div><input type="range" id="rt-swing" min="0" max="100" step="1"></div>
+              <div class="rt-knob"><div class="rt-knob-top"><label class="mono" for="rt-swing" lang="en">Swing</label><output class="mono" id="rt-swing-o" for="rt-swing"></output></div><input type="range" id="rt-swing" min="0" max="100" step="1"></div>
             </div>
           </div>
           <div class="rt-pagebar">
@@ -402,7 +406,7 @@ registerToy('ritim', {
             <div class="rt-presets" role="group" aria-label="Hazır ritimler"><span class="mono">Hazır</span>${Object.entries(PRESETS).map(([k, p]) => `<button type="button" class="chip" data-preset="${k}" aria-pressed="false">${p.name}</button>`).join('')}</div>
           </div>
         </div>
-        <p class="mono note rt-note">Adımlara tıkla ya da üzerlerinden sürükle · Shift + ped harfi o sesi susturur</p>
+        <p class="mono note rt-note"><span class="rt-note-k">Adımlara tıkla ya da üzerlerinden sürükle · <span lang="en">Shift</span> + ped harfi o sesi susturur</span><span class="rt-note-t">Adımlara dokun ya da üzerlerinden sürükle · M o sesi susturur</span></p>
       </div>`;
 
     const rootEl = $('.ritim-root', el), grid = $('.rt-grid', el), playBtn = $('.rt-play', el), pulseEl = $('.rt-pulse', el);
@@ -535,9 +539,10 @@ registerToy('ritim', {
       const s = S(), L = LETTERS[cur];
       let html;
       if (copying) html = `<b>${L}</b> → hangi slota?`;
+      else if (pending != null) html = `<b>${L}</b> → <b>${LETTERS[pending]}</b> · ölçü sonunda`;   // short, so the target never gets clipped
       else {
         const what = s.preset ? PRESETS[s.preset].name : s.name ? 'Zar · ' + s.name : isEmpty(s) ? 'Boş slot' : 'Kendi ritmin';
-        html = `<b>${L}</b> · ${what}${pending != null ? ` → <b>${LETTERS[pending]}</b>` : ''}`;
+        html = `<b>${L}</b> · ${what}`;
       }
       caps.forEach(c => { c.innerHTML = html; });
     }
@@ -572,11 +577,12 @@ registerToy('ritim', {
     /* ---------- undo for destructive actions (clear, dice, preset) ---------- */
     let undo = null, undoT = 0;
     function resetUndo() { if (undo) { undo = null; clearTimeout(undoT); clearBtn.textContent = 'Temizle'; } }
-    function snapshot() {
-      if (isEmpty(S())) { resetUndo(); return; }
-      undo = { i: cur, data: cloneSlot(S()) }; clearBtn.textContent = 'Geri al';
+    function keepUndo(i) {
+      if (isEmpty(slots[i])) { resetUndo(); return; }
+      undo = { i, data: cloneSlot(slots[i]) }; clearBtn.textContent = 'Geri al';
       clearTimeout(undoT); undoT = setTimeout(resetUndo, 5000);
     }
+    const snapshot = () => keepUndo(cur);
 
     /* ---------- editing ---------- */
     function edited() { const s = S(); if (s.preset || s.name) { s.preset = null; s.name = null; renderPresets(); } }
@@ -594,7 +600,9 @@ registerToy('ritim', {
     }
     function setCur(i) {
       cur = i; if (!playing) aSlot = i;
-      resetUndo(); renderAll(); save(); cascade();
+      resetUndo(); renderAll(); save();
+      if (!alive) return;
+      cascade();
       say(`Slot ${LETTERS[i]} · ${KITS[S().kit]} · ${S().bpm} BPM`);
     }
     function selectSlot(i) {
@@ -654,6 +662,7 @@ registerToy('ritim', {
     function exitCopy() { if (copying) { copying = false; renderSlots(); } }
     function copyTo(i) {
       const from = cur;
+      keepUndo(i);                                      // overwriting a slot is undoable like clear / dice / preset
       slots[i] = cloneSlot(S()); copying = false;
       renderSlots(); save(); vibrate(10);
       toast(`${LETTERS[from]} → ${LETTERS[i]} kopyalandı`);
@@ -667,7 +676,7 @@ registerToy('ritim', {
       sheet = document.createElement('div'); sheet.className = 'rt-sheet-wrap';
       sheet.innerHTML = `<div class="rt-sheet" role="dialog" aria-modal="true" aria-labelledby="rt-sheet-h">
         <div class="rt-sheet-top"><h2 id="rt-sheet-h">Hazır ritimler</h2><span class="mono">${LETTERS[cur]} slotuna</span></div>
-        <div class="rt-plist">${Object.entries(PRESETS).map(([k, p]) => `<button type="button" class="rt-pitem" data-preset="${k}" aria-pressed="${S().preset === k}"><span class="rt-ptxt"><b>${p.name}</b><span class="mono">${p.bpm} BPM · Swing %${p.swing}</span></span>${miniPreview(p)}</button>`).join('')}</div>
+        <div class="rt-plist">${Object.entries(PRESETS).map(([k, p]) => `<button type="button" class="rt-pitem" data-preset="${k}" aria-pressed="${S().preset === k}"><span class="rt-ptxt"><b>${p.name}</b><span class="mono">${p.bpm} BPM · <span lang="en">Swing</span> %${p.swing}</span></span>${miniPreview(p)}</button>`).join('')}</div>
         <button type="button" class="btn" data-close>Vazgeç</button>
       </div>`;
       sheet.addEventListener('click', e => {
@@ -678,6 +687,10 @@ registerToy('ritim', {
       ($('.rt-pitem[aria-pressed="true"]', sheet) || $('.rt-pitem', sheet)).focus({ preventScroll: true });
     }
     function closeSheet(refocus) { if (!sheet) return; sheet.remove(); sheet = null; if (refocus && pBtn.offsetParent) pBtn.focus({ preventScroll: true }); }
+    function trapTab(e) {                               // the sheet is modal: keep Tab inside it
+      const f = $$('button', sheet), a = document.activeElement, i = f.indexOf(a);
+      if (i < 0 || (e.shiftKey && i === 0) || (!e.shiftKey && i === f.length - 1)) { e.preventDefault(); f[i < 0 ? 0 : e.shiftKey ? f.length - 1 : 0].focus(); }
+    }
 
     /* ---------- pages (phone: 8 steps at a time) + roving focus ---------- */
     let narrow = false, paged = false, page = 0, follow = false, fT = 0, fS = 0;
@@ -775,10 +788,11 @@ registerToy('ritim', {
     $('.rt-pages', el).addEventListener('click', e => { const b = e.target.closest('.rt-pg'); if (!b) return; follow = false; setPage(+b.dataset.page, true); });
 
     /* grid: tap toggles, drag paints, pads play, M mutes */
-    let paint = null;
+    let paint = null, downAt = -1e9;
     const stepAt = (x, y) => { const h = document.elementFromPoint(x, y); const b = h && h.closest ? h.closest('.rt-step') : null; return b && grid.contains(b) ? b : null; };
     grid.addEventListener('pointerdown', e => {
       if (e.button > 0) return;
+      downAt = performance.now();
       const pad = e.target.closest('.rt-pad');
       if (pad) { e.preventDefault(); hit(pad.dataset.pad); return; }
       const b = e.target.closest('.rt-step'); if (!b) return;
@@ -800,12 +814,13 @@ registerToy('ritim', {
       });
     });
     const endPaint = e => { if (paint && (!e || e.pointerId === paint.id)) { paint = null; save(); } };
-    grid.addEventListener('pointerup', endPaint);
+    grid.addEventListener('pointerup', e => { downAt = performance.now(); endPaint(e); });
     grid.addEventListener('pointercancel', endPaint);
     grid.addEventListener('lostpointercapture', endPaint);
     grid.addEventListener('click', e => {
       const m = e.target.closest('.rt-mute'); if (m) { toggleMute(m.dataset.mute); return; }
-      if (e.detail !== 0) return;                       // keyboard activation only; pointers are handled above
+      /* keyboard activation only; pointers are handled above. A tap's click can also report detail 0, so skip clicks right after a press. */
+      if (e.detail !== 0 || performance.now() - downAt < 1000) return;
       const pad = e.target.closest('.rt-pad'); if (pad) { hit(pad.dataset.pad); return; }
       const b = e.target.closest('.rt-step'); if (!b) return;
       const id = b.closest('.rt-track').dataset.track, i = +b.dataset.i;
@@ -847,8 +862,17 @@ registerToy('ritim', {
 
     return {
       onKey(e) {
-        if (isField(e.target)) return;
         const k = e.key;
+        if (sheet) {                                    // modal sheet: Esc closes it, Tab stays inside, nothing reaches the rack
+          if (k === 'Escape') { e.preventDefault(); closeSheet(true); }
+          else if (k === 'Tab') trapTab(e);
+          return;
+        }
+        if (k === 'Escape') { if (copying) { e.preventDefault(); exitCopy(); say('Kopyalama iptal.'); } return; }
+        if (isField(e.target)) return;
+        /* Space plays from anywhere in the toy, but a focused stage-bar button (back, sound) keeps its own Space */
+        const t = e.target;
+        if (k === ' ' && t && t.closest && !el.contains(t) && t.closest('button, a')) return;
         if (k === ' ') { e.preventDefault(); if (!e.repeat) toggle(); return; }
         const sb = e.target && e.target.closest ? e.target.closest('.rt-step') : null;
         if (sb && k.startsWith('Arrow')) {

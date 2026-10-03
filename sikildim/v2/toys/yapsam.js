@@ -71,7 +71,7 @@ const IDEAS = [
   ['yarat', 30, 'Eski bir dergiden harfler kes ve alışveriş listeni fidye notu gibi yapıştır.'],
   ['yarat', 60, 'Karton kutular, kâğıt rulolar ve bantla bir bilye pisti kur. Bilye yoksa nohut da olur.'],
   ['hareket', 5, 'Yere bir kemer ser ve üstünde ip cambazı gibi yürü: her adımda topuk öbür ayağın burnuna değsin.'],
-  ['hareket', 5, 'Tek ayak üstünde dur ve havadaki ayağının bağcığını çözüp yeniden bağla. Sonra ayak değiştir.'],
+  ['hareket', 5, 'Tek ayak üstünde dur ve havadaki ayakkabının bağcığını çözüp yeniden bağla. Sonra ayak değiştir.'],
   ['hareket', 10, 'Yere bir kâğıt koy, sadece ayak parmaklarınla buruşturup top yap. Sonra öbür ayakla geri aç.'],
   ['hareket', 10, 'Yılan’da her kaybettiğinde kalk ve on kez zıpla. Dikkatli oynamak için güzel bir sebep.', 'yilan'],
   ['hareket', 15, 'Bir balon şişir ve yere düşürmeden yüz kez havaya vur. Eller, dizler, kafa: hepsi serbest.'],
@@ -127,6 +127,7 @@ registerToy('yapsam', {
 .tile:hover .art-cards i:nth-child(2) { transform: rotate(18deg) translate(38px, 6px); }
 .tile:hover .art-cards i:nth-child(3) { transform: translateY(-6px) rotate(-3deg); }
 
+.yapsam-root { touch-action: manipulation; }
 .yapsam-root .ys-filters { display: grid; justify-items: center; gap: 10px; width: 100%; }
 .yapsam-root .ys-time { max-width: 100%; }
 .yapsam-root .ys-time button { padding: 0 12px; white-space: nowrap; }
@@ -136,7 +137,15 @@ registerToy('yapsam', {
   .yapsam-root .ys-long { display: none; }
   .yapsam-root .ys-short { display: inline; }
 }
-.yapsam-root .deck { position: relative; width: min(100%, 640px); height: clamp(250px, 46vh, 430px); }
+/* Phone fingers: 44px tall hit areas around the 36px pills, without growing them (rows of chips get 8px between them so areas never overlap). */
+.yapsam-root .seg button, .yapsam-root .chip { position: relative; }
+@media (pointer: coarse) {
+  .yapsam-root .seg button::after { content: ""; position: absolute; inset: -4px -1.5px; }
+  .yapsam-root .chips { row-gap: 8px; }
+  .yapsam-root .chip::after { content: ""; position: absolute; inset: -4px -3px; border-radius: 999px; }
+}
+/* The ghost cards peek ~13px below the deck: the margin keeps them off the buttons. */
+.yapsam-root .deck { position: relative; width: min(100%, 640px); height: clamp(250px, 46vh, 430px); margin-bottom: 10px; }
 .yapsam-root .deck-ghost { position: absolute; inset: 0; border-radius: var(--r-xl); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
 .yapsam-root .deck-ghost.g1 { transform: translateY(12px) scale(.955) rotate(1.6deg); }
 .yapsam-root .deck-ghost.g2 { transform: translateY(24px) scale(.91) rotate(-2.2deg); background: var(--panel-2); }
@@ -144,7 +153,7 @@ registerToy('yapsam', {
   position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; gap: 12px;
   padding: clamp(20px, 3vw, 32px); border-radius: var(--r-xl); background: var(--c); color: var(--cf);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 22px 44px -26px var(--shade);
-  touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab;
+  touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: grab;
 }
 .yapsam-root .idea.dragging { cursor: grabbing; }
 .yapsam-root .idea.leaving { z-index: 3; pointer-events: none; }
@@ -161,22 +170,44 @@ registerToy('yapsam', {
 }
 .yapsam-root .idea-link:hover { transform: translateX(3px); }
 .yapsam-root .idea-link:active { transform: scale(.96); }
-.yapsam-root .idea-link i { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--lc); }
+.yapsam-root .idea-link:focus-visible { outline-color: var(--on-light); }
+.yapsam-root .idea-link i { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--lc); box-shadow: 0 0 0 1px rgba(255, 255, 255, .45); }   /* the ring keeps a dark swatch (Hızlı yaz) visible on the dark pill */
 .yapsam-root .idea-link span:first-of-type { overflow: hidden; text-overflow: ellipsis; }
 .yapsam-root .stamp {
   position: absolute; top: 24%; right: clamp(16px, 4vw, 40px); padding: 8px 16px; border: 3.5px solid currentColor; border-radius: 12px;
-  font: 800 clamp(22px, 3vw, 30px)/1 var(--f-mono); letter-spacing: .06em; opacity: 0; transform: rotate(-10deg);
+  font: 800 clamp(22px, 3vw, 30px)/1 var(--f-mono); letter-spacing: .06em; opacity: 0; transform: rotate(-10deg); pointer-events: none;
 }
 .yapsam-root .ys-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .yapsam-root .ys-empty { display: grid; place-content: center; gap: 16px; text-align: center; justify-items: center; }
+.yapsam-root .ys-empty .idea-text { margin: 0; }
+.yapsam-root .ys-empty .btn:focus-visible { outline-color: var(--on-light); }
 @media (max-width: 359px) {
+  .yapsam-root .ys-time button { padding: 0 8px; }
   .yapsam-root .ys-actions .btn { padding: 0 16px; }
   .yapsam-root .chips .chip { padding: 0 10px; font-size: 13.5px; }
 }
 @media (max-height: 640px) {
   .yapsam-root { gap: 10px; }
-  .yapsam-root .deck { height: clamp(220px, 40vh, 430px); }
+  .yapsam-root .deck { height: clamp(210px, 38vh, 430px); }
 }
+/* A phone on its side: the card takes the left, filters and buttons stack on the right, nothing scrolls. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .yapsam-root {
+    flex: 1 0 auto; margin-block: 0; display: grid; align-content: stretch; align-items: start;
+    grid-template-columns: minmax(0, 1fr) 310px; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 8px clamp(16px, 3vw, 28px);
+  }
+  .yapsam-root .ys-filters { grid-column: 2; grid-row: 1; gap: 8px; }
+  .yapsam-root .chips .chip { padding: 0 12px; }
+  .yapsam-root .ys-time button { padding: 0 10px; }
+  .yapsam-root .ys-long { display: none; }
+  .yapsam-root .ys-short { display: inline; }
+  .yapsam-root .deck { grid-column: 1; grid-row: 1 / -1; align-self: stretch; width: 100%; height: auto; min-height: 190px; margin: 0 0 14px; }
+  .yapsam-root .idea-text, .yapsam-root .idea-text.long { max-width: 30ch; font-size: clamp(19px, 2.7vw, 26px); }
+  .yapsam-root .ys-actions { grid-column: 2; grid-row: 3; }
+  .yapsam-root .ys-actions .btn { padding: 0 16px; }
+  .yapsam-root .note { grid-column: 2; grid-row: 4; }
+}
+@media (orientation: landscape) and (max-height: 340px) { .yapsam-root .note { display: none; } }
 `,
   hint: 'Boşluk başka · Y yaptım · kartı kaydır',
   mount(el) {
@@ -184,7 +215,7 @@ registerToy('yapsam', {
     if (!TIMES[time]) time = 'hepsi';
     if (cat !== 'hepsi' && !CATS[cat]) cat = 'hepsi';
     const done = new Set(validDone());
-    const timeBtn = ([k, [label, , short]]) => `<button type="button" data-time="${k}" aria-pressed="${k === time}">${short ? `<span class="ys-long">${label}</span><span class="ys-short">${short}</span>` : label}</button>`;
+    const timeBtn = ([k, [label, , short]]) => `<button type="button" data-time="${k}" aria-pressed="${k === time}"${short ? ` aria-label="${label}"` : ''}>${short ? `<span class="ys-long">${label}</span><span class="ys-short">${short}</span>` : label}</button>`;
     el.innerHTML = `
       <div class="toy yapsam-root">
         <div class="ys-filters">
@@ -199,7 +230,7 @@ registerToy('yapsam', {
         <p class="mono note" id="ys-meta"></p>
       </div>`;
     const deck = $('#ys-deck', el), meta = $('#ys-meta', el), doneBtn = $('#ys-done', el);
-    let order = [], pos = 0, card = null, curIdx = -1, busy = false, drag = null, doneT = 0;
+    let order = [], pos = 0, card = null, curIdx = -1, busy = false, drag = null, doneT = 0, tabbed = false;
     const pool = () => IDEAS.map((_, i) => i).filter(i => { const [c, m] = IDEAS[i]; return (cat === 'hepsi' || c === cat) && TIMES[time][1](m) && !done.has(i); });
     const timeLabel = m => m >= 60 ? `${m / 60} saat` : `${m} dk`;
     function updateMeta() { meta.textContent = `Bu filtrede ${pool().length} fikir · ${done.size} yapıldı`; doneBtn.disabled = curIdx < 0; }
@@ -221,9 +252,13 @@ registerToy('yapsam', {
       }
       return a;
     }
+    /* Everything done: with no filter left to clear, offer a fresh deck instead of a button that does nothing. */
+    const allDone = () => cat === 'hepsi' && time === 'hepsi';
     function emptyCard() {
       const a = document.createElement('article'); a.className = 'idea ys-empty';
-      a.innerHTML = `<p class="idea-text">Bu filtrede yapmadığın fikir kalmadı.</p><button type="button" class="btn primary" data-reset>Filtreyi temizle</button>`;
+      a.innerHTML = allDone()
+        ? `<p class="idea-text">${IDEAS.length} fikrin hepsini yaptın. Helal olsun.</p><button type="button" class="btn primary" data-restart>Desteyi baştan karıştır</button>`
+        : `<p class="idea-text">Bu filtrede yapmadığın fikir kalmadı.</p><button type="button" class="btn primary" data-reset>Filtreyi temizle</button>`;
       return a;
     }
     function fly(old, dir) {
@@ -232,40 +267,56 @@ registerToy('yapsam', {
       const from = old.style.transform || 'none';
       old.animate([{ transform: from, opacity: 1 }, { transform: `translate(${dir * 125}%, -5%) rotate(${dir * 16}deg)`, opacity: 0 }], { duration: 520, easing: 'cubic-bezier(.4,.1,.6,1)', fill: 'forwards' }).onfinish = () => old.remove();
     }
-    function next(dir = -1) {
+    function nudge() { if (card && motionOK()) card.animate([{ transform: 'none' }, { transform: 'translateX(-10px)' }, { transform: 'translateX(7px)' }, { transform: 'none' }], { duration: 320, easing: 'ease-out' }); }
+    function next(dir = -1, force = false) {
       if (busy) return;
       if (pos >= order.length) {
         order = shuffle(pool()); pos = 0;
         if (order.length > 1 && order[0] === curIdx) order.push(order.shift());
       }
+      if (!order.length && card && curIdx < 0 && !force) { nudge(); return; }   // already showing the empty card: nothing new to deal
       const old = card;
       if (!order.length) { card = emptyCard(); curIdx = -1; } else { curIdx = order[pos++]; card = makeCard(curIdx); }
       deck.append(card);
       if (old) fly(old, dir);
       if (motionOK()) card.animate([{ transform: 'translateY(14px) scale(.955) rotate(1.6deg)', opacity: 0.4 }, { transform: 'none', opacity: 1 }], { duration: 480, delay: old ? 70 : 0, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
       updateMeta();
+      if (curIdx >= 0) { const [c, m, text] = IDEAS[curIdx]; say(`${CATS[c]}, ${timeLabel(m)}. ${text}`); }
+      else say(card.querySelector('.idea-text').textContent);
     }
     function markDone() {
       if (busy || curIdx < 0) return;
       busy = true; done.add(curIdx); store.set('ys-done', [...done]);
-      const stamp = document.createElement('div'); stamp.className = 'stamp'; stamp.textContent = 'YAPILDI'; card.append(stamp);
+      if (drag) { drag.el.classList.remove('dragging'); drag = null; }
+      card.style.transform = '';
+      const stamp = document.createElement('div'); stamp.className = 'stamp'; stamp.textContent = 'YAPILDI'; stamp.setAttribute('aria-hidden', 'true'); card.append(stamp);
       Sound.chime(); vibrate(10); say('Yapıldı olarak işaretlendi.');
+      meta.textContent = `Bu filtrede ${pool().length} fikir · ${done.size} yapıldı`;
       if (motionOK()) stamp.animate([{ transform: 'rotate(-10deg) scale(1.9)', opacity: 0 }, { transform: 'rotate(-10deg) scale(1)', opacity: 1 }], { duration: 280, easing: 'cubic-bezier(.3,1.4,.6,1)', fill: 'forwards' });
       else stamp.style.opacity = 1;
       doneT = setTimeout(() => { busy = false; next(1); }, motionOK() ? 680 : 250);
     }
-    function refilter() { store.set('ys-time', time); store.set('ys-cat', cat); order = []; pos = 0; next(-1); }
+    function refilter() { store.set('ys-time', time); store.set('ys-cat', cat); order = []; pos = 0; next(-1, true); }
+    function pressAll() {
+      $$('[data-time]', el).forEach(b => b.setAttribute('aria-pressed', b.dataset.time === time));
+      $$('[data-cat]', el).forEach(b => b.setAttribute('aria-pressed', b.dataset.cat === cat));
+    }
     el.addEventListener('click', e => {
       const tb = e.target.closest('[data-time]'), cb = e.target.closest('[data-cat]');
-      if (tb) { time = tb.dataset.time; $$('[data-time]', el).forEach(b => b.setAttribute('aria-pressed', b === tb)); refilter(); }
-      else if (cb) { cat = cb.dataset.cat; $$('[data-cat]', el).forEach(b => b.setAttribute('aria-pressed', b === cb)); refilter(); }
-      else if (e.target.closest('[data-reset]')) { time = 'hepsi'; cat = 'hepsi'; $$('[data-time]', el).forEach(b => b.setAttribute('aria-pressed', b.dataset.time === 'hepsi')); $$('[data-cat]', el).forEach(b => b.setAttribute('aria-pressed', b.dataset.cat === 'hepsi')); refilter(); }
+      if (tb) { time = tb.dataset.time; pressAll(); refilter(); }
+      else if (cb) { cat = cb.dataset.cat; pressAll(); refilter(); }
+      else if (e.target.closest('[data-reset]')) { time = 'hepsi'; cat = 'hepsi'; pressAll(); refilter(); }
+      else if (e.target.closest('[data-restart]')) { done.clear(); store.set('ys-done', []); refilter(); }
     });
+    /* A mouse click must not leave focus on a control, so Space and Y keep working as shortcuts afterwards. */
+    el.addEventListener('mousedown', e => { if (e.target.closest('button, a')) e.preventDefault(); });
+    const onPointer = () => { tabbed = false; };
+    document.addEventListener('pointerdown', onPointer, true);
     $('#ys-next', el).addEventListener('click', () => next(-1));
     doneBtn.addEventListener('click', markDone);
     deck.addEventListener('pointerdown', e => {
-      if (!card || busy || e.button > 0 || e.target.closest('a, button')) return;
-      drag = { x: e.clientX, dx: 0, id: e.pointerId, el: card };
+      if (drag || !card || busy || e.button > 0 || e.target.closest('a, button')) return;   // one finger drives the card; a second one is ignored
+      drag = { x: e.clientX, dx: 0, t: e.timeStamp, id: e.pointerId, el: card };
       card.classList.add('dragging');
       try { deck.setPointerCapture(e.pointerId); } catch (err) {}
     });
@@ -276,21 +327,27 @@ registerToy('yapsam', {
     });
     const endDrag = e => {
       if (!drag || e.pointerId !== drag.id) return;
-      const { dx, el: c } = drag; drag = null; c.classList.remove('dragging');
-      if (Math.abs(dx) > 90 && c === card) next(dx > 0 ? 1 : -1);
+      const { dx, t, el: c } = drag; drag = null; c.classList.remove('dragging');
+      const fast = e.type === 'pointerup' && Math.abs(dx) > 40 && Math.abs(dx) / Math.max(1, e.timeStamp - t) > 0.35;   // a quick flick counts too
+      if ((Math.abs(dx) > 90 || fast) && c === card) next(dx > 0 ? 1 : -1);
       else { if (Math.abs(dx) > 2 && motionOK()) c.animate([{ transform: c.style.transform }, { transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.3,1.4,.6,1)' }); c.style.transform = ''; }
     };
     deck.addEventListener('pointerup', endDrag);
     deck.addEventListener('pointercancel', endDrag);
+    deck.addEventListener('lostpointercapture', endDrag);
     next(-1);
     return {
       onKey(e) {
         if (isField(e.target)) return;
+        if (e.key === 'Tab') { tabbed = true; return; }
+        /* A control reached with Tab gets its own Space / Enter. */
+        const ctl = e.target && e.target.closest ? e.target.closest('button, a[href]') : null;
+        if (ctl && (e.key === ' ' || e.key === 'Enter') && (tabbed || el.contains(ctl))) return;
         if (e.key === ' ' || e.key === 'ArrowRight') { e.preventDefault(); next(-1); }
         else if (e.key === 'ArrowLeft') { e.preventDefault(); next(1); }
         else if (e.key.toLocaleLowerCase('tr') === 'y' && !e.repeat) { e.preventDefault(); markDone(); }
       },
-      destroy() { clearTimeout(doneT); },
+      destroy() { clearTimeout(doneT); document.removeEventListener('pointerdown', onPointer, true); },
     };
   },
 });

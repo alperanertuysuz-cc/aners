@@ -1,5 +1,5 @@
 /* Kelime — word lists for the daily Turkish 5-letter puzzle (toys/kelime.js).
-   answers: 753 common, family-friendly dictionary lemmas (nouns, adjectives; no inflected forms, proper nouns or abbreviations).
+   answers: 752 common, family-friendly dictionary lemmas (nouns, adjectives; no inflected forms, proper nouns or abbreviations).
    allowed: answers + 5899 more valid 5-letter words (dictionary lemmas plus common inflected forms) that are accepted as guesses.
    Sources for `extra`: every word appears in Vikisözlük’s Turkish word list (CC BY-SA, via github.com/mertemin/turkish-word-list)
    or in FrequencyWords tr_50k by Hermit Dave (CC BY-SA 4.0, github.com/hermitdave/FrequencyWords); this file is shared under CC BY-SA 4.0.
@@ -32,7 +32,7 @@ güzel haber hafif hafta hakem haklı halat halka hamam hamle hamsi hamur hanım
 hayal hayat hazır hedef hekim helva hesap hızlı hindi horoz hukuk hurda hurma huzur hücre hüzün ırmak ıslak
 ıslık ideal ikili iklim ikram iksir ileri ilham inanç incir insan iplik israf istek joker kabak kabin kablo
 kabuk kader kadın kafes kağıt kahve kalem kalfa kalın kalıp kanal kanat kanca kapak karar karga kargo karlı
-karne kasap kasım kaşar kaşık katır katkı kavak kaval kavun kayak kayık kayıp kayıt kazak kazan kebap kekik
+karne kasap kasım kaşık katır katkı kavak kaval kavun kayak kayık kayıp kayıt kazak kazan kebap kekik
 keman kemer kemik kenar kesim keşif keyif kırık kısım kızıl kibar kiler kilim kilit kimya kiraz kirli kirpi
 kitap kitle koala kobra kolay kolej kolye komik komşu konuk konum kopya korku kovan koyun köfte kömür köpek
 köprü köpük kredi krema kubbe kucak kukla kulak kulüp kumaş kumru kural kurgu kurum kuruş kurye kuşak kuşku
@@ -58,6 +58,7 @@ yedek yelek yemek yenge yerli yeşil yetki yığın yılan yiğit yirmi yoğun y
 yürek yüzey yüzme yüzük zafer zaman zarar zarif zayıf zebra zemin zerre zihin zirve zurna
 `.trim().split(/\s+/);
 const extra = `
+kaşar
 abacı abadi abalı abani abaşo abayı abbas abdal abece abide abime abimi abine abini abisi abiye ablak ablam ablan
 abone abraş abril abuli acaba aceze acıca acıdı acılı acıma acımı acını acısı acıya acıyı acibe acile acube acuze
 açana açgöz açıcı açığa açığı açısı açmak açmam açman açmaz açmış açsam açsan açsın açtık açtım açtın açval adada
