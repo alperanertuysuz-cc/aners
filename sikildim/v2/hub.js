@@ -4,6 +4,7 @@
 /* ================= Registry → shelf ================= */
 const ORDER = ['kelime', 'yilan', 'ritim', 'patlat', 'refleks', 'melodi', '2048', 'duello', 'hafiza', 'kaleydoskop', 'yaz', 'yapsam', 'nefes'].filter(id => TOYS[id]);
 Object.keys(TOYS).forEach(id => { if (!ORDER.includes(id)) ORDER.push(id); });
+const FEATURED = 'kelime';   // the daily puzzle gets the big tile: 2×2 on desktop, full width on phones, so 13 toys fill the grid exactly
 const FILTERS = [['hepsi', 'Hepsi'], ['oyun', 'Oyun'], ['kafa', 'Kafa'], ['yaratici', 'Yaratıcı'], ['sakin', 'Sakin'], ['ikili', 'İki kişilik']];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const toyColor = id => `var(--${TOYS[id].color || 'yellow'})`;
@@ -17,7 +18,7 @@ let filter = store.get('filter', 'hepsi');
 
 shelf.innerHTML = ORDER.map((id, i) => {
   const t = TOYS[id];
-  return `<a class="tile" href="#${esc(id)}" data-toy="${esc(id)}" style="--c: ${toyColor(id)}; --cf: ${toyInk(id)};">
+  return `<a class="tile${id === FEATURED ? ' tile--feature' : ''}" href="#${esc(id)}" data-toy="${esc(id)}" style="--c: ${toyColor(id)}; --cf: ${toyInk(id)};">
     <div class="tile-top"><span class="mono">${esc(t.kind)}</span>${i < 9 ? `<kbd>${i + 1}</kbd>` : ''}</div>
     <div class="art" aria-hidden="true">${t.art || ''}</div>
     <div><h2 class="tile-name">${esc(t.name)}</h2><p class="tile-desc">${esc(t.desc)}</p><p class="tile-stat mono" data-stat="${esc(id)}"></p></div>
@@ -88,7 +89,10 @@ function stopToy() {
   try { if (current.inst.destroy) current.inst.destroy(); } catch (err) { console.error(err); }
   store.set('time', store.get('time', 0) + (performance.now() - current.t0));
   current = null;
+  clearTimeout(idleAudio);
+  idleAudio = setTimeout(() => { if (!current && Sound.ctx && Sound.ctx.state === 'running') Sound.ctx.suspend().catch(() => {}); }, 5000);
 }
+let idleAudio = 0;
 const veilOff = () => { veil.getAnimations().forEach(a => a.cancel()); veil.style.opacity = 0; veil.hidden = true; };
 const visibleRect = el => { if (!el || el.hidden || !el.offsetParent) return null; const r = el.getBoundingClientRect(); return r.width && r.bottom > 0 && r.top < innerHeight ? r : null; };
 const insetFrom = (r, rad = 28) => `inset(${r.top}px ${innerWidth - r.right}px ${innerHeight - r.bottom}px ${r.left}px round ${rad}px)`;
@@ -113,7 +117,7 @@ function openToy(id, opts = {}) {
   } else veilOff();
   clearTimeout(coverT);
   coverT = setTimeout(() => { hub.inert = true; hub.classList.add('covered'); }, r ? 680 : 0);
-  if (!stageBody.querySelector(':focus')) $('#back').focus({ preventScroll: true });
+  if (!stageBody.querySelector(':focus')) stage.focus({ preventScroll: true });
 }
 function swapToy(id) {
   const run = () => { stopToy(); setStageMeta(id); mountToy(id); };
@@ -229,8 +233,9 @@ function syncTheme() {
   const bg = getComputedStyle(document.body).backgroundColor;
   $$('meta[name="theme-color"]').forEach(m => m.setAttribute('content', bg));
 }
-themeBtn.addEventListener('click', () => { root.dataset.theme = isDark() ? 'light' : 'dark'; store.set('theme', root.dataset.theme); syncTheme(); });
-if (darkMQ.addEventListener) darkMQ.addEventListener('change', syncTheme);
+const themeEvent = () => window.dispatchEvent(new CustomEvent('sikildim:theme', { detail: { dark: isDark() } }));
+themeBtn.addEventListener('click', () => { root.dataset.theme = isDark() ? 'light' : 'dark'; store.set('theme', root.dataset.theme); syncTheme(); themeEvent(); });
+if (darkMQ.addEventListener) darkMQ.addEventListener('change', () => { syncTheme(); themeEvent(); });
 
 /* ================= Reset with in-page confirmation ================= */
 const resetZone = $('#reset-zone');
@@ -252,8 +257,8 @@ resetZone.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (current) {
-    if (e.key === 'Escape') { e.preventDefault(); goHub(); return; }
-    if (current.inst.onKey) current.inst.onKey(e);
+    if (current.inst.onKey) { try { current.inst.onKey(e); } catch (err) { console.error(err); } }
+    if (e.key === 'Escape' && !e.defaultPrevented && current) { e.preventDefault(); goHub(); }
     return;
   }
   if (e.key === 'Escape') { const sw = $('.sheet-wrap'); if (sw) { sw.remove(); return; } }
@@ -329,6 +334,17 @@ if (motionOK()) {
   ], { duration: 1150, delay: 380, easing: 'cubic-bezier(.45,0,.55,1)', fill: 'backwards' });
   $$('.tile', shelf).forEach((t, k) => t.animate([{ transform: 'translateY(26px)', opacity: 0.35 }, { transform: 'none', opacity: 1 }], { duration: 720, delay: 140 + Math.min(k, 8) * 50, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }));
 }
+/* Keep the headline on one line even with a wide fallback font (before web fonts load, or offline on first visit). */
+const titleEl = $('.title');
+function fitTitle() {
+  titleEl.style.fontSize = '';
+  const avail = titleEl.parentElement.clientWidth, need = titleEl.scrollWidth;
+  if (need > avail) titleEl.style.fontSize = (parseFloat(getComputedStyle(titleEl).fontSize) * avail / need * 0.98).toFixed(1) + 'px';
+}
+let fitRaf = 0;
+addEventListener('resize', () => { cancelAnimationFrame(fitRaf); fitRaf = requestAnimationFrame(fitTitle); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTitle);
+fitTitle();
 renderFilters(); refreshStats(); syncSound(); syncTheme(); syncInstall();
 (() => {
   const id = decodeURIComponent(location.hash.slice(1));

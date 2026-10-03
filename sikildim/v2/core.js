@@ -122,8 +122,11 @@ const Sound = (() => {
     const g2 = env(t, vol * 0.35, 0.002, 0.25); g2.connect(lp); osc('sine', freq * 2, t, g2, 0.3);
     const g3 = env(t, vol * 0.12, 0.001, 0.05); g3.connect(lp); osc('sine', freq * 4.01, t, g3, 0.08);
   }
+  /* Touch pointerdown is not a user activation; unlock audio on the first real one so later pointerdown sounds play instantly. */
+  const unlock = () => { if (!ctx || ctx.state !== 'running') ensure(); };
+  ['pointerup', 'touchend', 'keydown', 'click'].forEach(t => document.addEventListener(t, unlock, { capture: true, passive: true }));
   function setOn(v) { on = v; store.set('sound', v); if (out) out.gain.setTargetAtTime(v ? 0.85 : 0, ctx.currentTime, 0.02); subs.forEach(fn => fn(v)); }
-  return { ensure, drum, blip, chime, buzz, pop, swell, tone, pluck, env, noise, filt, osc, setOn, onChange: fn => subs.add(fn), get on() { return on; }, get ctx() { return ctx; }, get out() { return out; } };
+  return { ensure, drum, blip, chime, buzz, pop, swell, tone, pluck, env, noise, filt, osc, setOn, onChange: fn => { subs.add(fn); return () => subs.delete(fn); }, get on() { return on; }, get ctx() { return ctx; }, get out() { return out; } };
 })();
 
 /* ================= Toy registry ================= */
