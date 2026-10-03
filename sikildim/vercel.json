@@ -1,0 +1,16 @@
+{
+  "trailingSlash": true,
+  "headers": [
+    {
+      "source": "/v2/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/v2/" }
+      ]
+    },
+    {
+      "source": "/v2/manifest.webmanifest",
+      "headers": [{ "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" }]
+    }
+  ]
+}

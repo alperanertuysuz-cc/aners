@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sıkıldım</title>
+<meta name="description" content="Can sıkıntısına karşı küçük oyuncaklar: kelime bulmacası, yılan, davul makinesi, melodi, refleks, düello, balonlu naylon ve daha fazlası. Telefona uygulama gibi eklenir, internetsiz çalışır.">
+<meta name="theme-color" content="#E5E6E8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101113" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Sıkıldım">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800&family=JetBrains+Mono:wght@400..700&display=swap">
+<link rel="stylesheet" href="app.css">
+<script defer src="core.js"></script>
+<script defer src="toys/kelime-words.js"></script>
+<script defer src="toys/kelime.js"></script>
+<script defer src="toys/yilan.js"></script>
+<script defer src="toys/ritim.js"></script>
+<script defer src="toys/patlat.js"></script>
+<script defer src="toys/refleks.js"></script>
+<script defer src="toys/melodi.js"></script>
+<script defer src="toys/2048.js"></script>
+<script defer src="toys/duello.js"></script>
+<script defer src="toys/hafiza.js"></script>
+<script defer src="toys/kaleydoskop.js"></script>
+<script defer src="toys/yaz.js"></script>
+<script defer src="toys/yapsam.js"></script>
+<script defer src="toys/nefes.js"></script>
+<script defer src="hub.js"></script>
+</head>
+<body>
+<div id="app" lang="tr">
+<a class="skip" href="#shelf">Oyuncaklara geç</a>
+
+<div class="hub" id="hub">
+  <header class="wrap top">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span class="mono">Oyuncak kutusu</span>
+    </div>
+    <div class="top-actions">
+      <button type="button" class="icon-btn sound-btn" aria-pressed="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path class="ico-on" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="ico-on" d="M18.5 5.5a9 9 0 0 1 0 13"/><path class="ico-off" d="m16 9 6 6m0-6-6 6"/></svg>
+        <span class="lbl">Ses açık</span>
+      </button>
+      <button type="button" class="icon-btn" id="theme-btn" aria-label="Temayı değiştir">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor"/></svg>
+        <span class="lbl">Tema</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero" aria-labelledby="hero-title">
+      <p class="eyebrow mono" id="eyebrow">Can sıkıntısına karşı küçük oyuncaklar</p>
+      <div class="hero-main">
+        <h1 class="title" id="hero-title" aria-label="Sıkıldım."><span class="title-word" aria-hidden="true">Sıkıldım</span><span class="dot" id="dot" aria-hidden="true"></span></h1>
+        <div class="hero-side">
+          <p class="lede"><strong>O zaman doğru yerdesin.</strong> Kelime bul, ritim kur, balon patlat ya da bir arkadaşına düello at. Kayıt yok, reklam yok, internet olmadan da çalışır.</p>
+          <div class="hero-cta">
+            <button type="button" class="roll" data-roll>
+              <svg viewBox="0 0 28 28" aria-hidden="true"><rect x="2.5" y="2.5" width="23" height="23" rx="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="9" cy="9" r="2.1" fill="currentColor"/><circle cx="19" cy="9" r="2.1" fill="currentColor"/><circle cx="14" cy="14" r="2.1" fill="currentColor"/><circle cx="9" cy="19" r="2.1" fill="currentColor"/><circle cx="19" cy="19" r="2.1" fill="currentColor"/></svg>
+              <i class="roll-sw" aria-hidden="true"></i><span class="roll-label">Bana bir şey seç</span> <kbd>R</kbd>
+            </button>
+            <p class="mono meta" id="meta">Sıkılmadan geçen süre · <b>0 dk</b></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="hub-tools">
+      <a class="resume" id="resume" href="#" hidden><i aria-hidden="true"></i><span class="mono">Kaldığın yer</span><span id="resume-name"></span><span aria-hidden="true">→</span></a>
+      <div class="filters" id="filters" role="group" aria-label="Oyuncakları süz"></div>
+    </div>
+
+    <section class="shelf" id="shelf" aria-label="Oyuncaklar"></section>
+  </main>
+
+  <footer class="wrap foot mono">
+    <p>Skorlar ve ayarlar yalnızca bu cihazda saklanır.</p>
+    <button type="button" class="link-btn install-btn" id="foot-install" hidden>Ana ekrana ekle</button>
+    <div class="foot-reset" id="reset-zone">
+      <button type="button" class="link-btn" id="reset">Skorları sıfırla</button>
+    </div>
+  </footer>
+
+  <div class="dock" id="dock">
+    <button type="button" class="roll" data-roll>
+      <svg viewBox="0 0 28 28" aria-hidden="true"><rect x="2.5" y="2.5" width="23" height="23" rx="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="9" cy="9" r="2.1" fill="currentColor"/><circle cx="19" cy="9" r="2.1" fill="currentColor"/><circle cx="14" cy="14" r="2.1" fill="currentColor"/><circle cx="9" cy="19" r="2.1" fill="currentColor"/><circle cx="19" cy="19" r="2.1" fill="currentColor"/></svg>
+      <i class="roll-sw" aria-hidden="true"></i><span class="roll-label">Bana bir şey seç</span>
+    </button>
+    <button type="button" class="icon-btn install-btn" id="dock-install" aria-label="Ana ekrana ekle" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19h14"/></svg>
+      <span class="lbl">Ekle</span>
+    </button>
+  </div>
+</div>
+
+<div class="stage" id="stage" role="dialog" aria-modal="true" aria-labelledby="stage-title" hidden>
+  <div class="stage-veil" id="stage-veil" aria-hidden="true" hidden></div>
+  <div class="stage-bar">
+    <button type="button" class="back" id="back" aria-label="Oyuncak kutusuna dön">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+      <span>Kutu</span><kbd>Esc</kbd>
+    </button>
+    <div class="stage-id">
+      <span class="stage-swatch" aria-hidden="true"></span>
+      <span class="mono stage-kind" id="stage-kind"></span>
+      <h2 class="stage-title" id="stage-title"></h2>
+    </div>
+    <div class="stage-right">
+      <p class="mono stage-hint" id="stage-hint"></p>
+      <button type="button" class="icon-btn sound-btn" aria-pressed="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path class="ico-on" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="ico-on" d="M18.5 5.5a9 9 0 0 1 0 13"/><path class="ico-off" d="m16 9 6 6m0-6-6 6"/></svg>
+        <span class="lbl">Ses açık</span>
+      </button>
+    </div>
+  </div>
+  <div class="stage-body" id="stage-body"></div>
+</div>
+
+<div class="sr-only" aria-live="polite" id="live"></div>
+</div>
+</body>
+</html>

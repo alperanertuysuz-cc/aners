@@ -1,0 +1,26 @@
+{
+  "id": "./",
+  "name": "Sıkıldım",
+  "short_name": "Sıkıldım",
+  "description": "Can sıkıntısına karşı küçük oyuncaklar: kelime bulmacası, yılan, davul makinesi, melodi, düello ve daha fazlası.",
+  "lang": "tr",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#E5E6E8",
+  "theme_color": "#E5E6E8",
+  "categories": ["games", "entertainment", "music"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Kelime", "short_name": "Kelime", "description": "Günün kelimesi", "url": "./#kelime" },
+    { "name": "Yılan", "short_name": "Yılan", "url": "./#yilan" },
+    { "name": "Ritim", "short_name": "Ritim", "url": "./#ritim" },
+    { "name": "Patlat", "short_name": "Patlat", "url": "./#patlat" }
+  ]
+}
