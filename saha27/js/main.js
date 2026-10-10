@@ -97,6 +97,7 @@ function unlockAudio() { snd.unlock(); snd.setAmbient(0.22); }
 $('#startBtn').addEventListener('click', () => { unlockAudio(); show('menu'); renderMenuSide(); });
 addEventListener('keydown', (e) => {
   if (scr === 'title' && !e.repeat) { unlockAudio(); show('menu'); renderMenuSide(); e.preventDefault(); return; }
+  if (scr === 'pause' && (e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { pause(false); e.preventDefault(); return; }
   if (scr && scr !== 'title' && (!G || G.paused || scr === 'stats')) {
     if (e.code === 'Escape' || e.code === 'Backspace') { const b = $(`.screen.on [data-back]`); if (b && document.activeElement?.tagName !== 'INPUT') { b.click(); e.preventDefault(); } }
     if (e.code === 'ArrowDown' || e.code === 'ArrowUp') { moveFocus(e.code === 'ArrowDown' ? 1 : -1); e.preventDefault(); }
@@ -549,6 +550,7 @@ function endReplay() {
 // ------------------------------------------------------------------ stats overlay
 function showStats(kind) {
   if (!G) return;
+  G.paused = false;
   const m = G.match;
   G.ended = kind === 'full';
   const sum = m.summary();
@@ -569,10 +571,10 @@ function showStats(kind) {
   const btns = $('#stBtns');
   btns.innerHTML = '';
   const add = (label, cls, fn) => { const b = document.createElement('button'); b.className = cls; b.textContent = label; b.onclick = () => { snd.ui(); fn(); }; btns.appendChild(b); };
-  if (kind === 'half') add('İkinci yarı', 'cta', () => { hideScreens(); G.match.startSecondHalf(); R.snapCamera(); input.reset(); });
+  if (kind === 'half') add('İkinci yarı', 'cta', () => { hideScreens(); G.paused = false; $('#fade').classList.remove('on'); G.match.startSecondHalf(); R.snapCamera(); input.reset(); });
   else {
     const draw = sum[0].score === sum[1].score;
-    if (G.o.knockout && draw && !so && m.cfg.mode === 'match') add('Penaltılar', 'cta', () => { hideScreens(); G.ended = false; G.match.startShootout(); input.reset(); });
+    if (G.o.knockout && draw && !so && m.cfg.mode === 'match') add('Penaltılar', 'cta', () => { hideScreens(); G.paused = false; G.ended = false; G.match.startShootout(); input.reset(); });
     else if (G.o.kind === 'career') add('Devam', 'cta', () => { careerRecord(m); endGame('career'); });
     else {
       add('Menü', 'ghost', () => endGame('menu'));
@@ -838,7 +840,7 @@ function frame(now) {
     const fixed = (S.cam === 'broadcast' || S.cam === 'tele') && m.state !== 'pen' && G.penCam <= 0;
     const basis = fixed ? { fx: 0, fz: -1, rx: 1, rz: 0 } : R.basis();
     const cmds = input.poll(dt, basis, m.humans.length);
-    if (cmds[0].pause && !G.replay && scr !== 'stats') { pause(!G.paused); input.consume(); }
+    if (cmds[0].pause && !G.replay && (!scr || scr === 'pause')) { pause(!G.paused); input.consume(); }
     if (G.replay) {
       stepReplay(dt);
       if (G && G.replay && (cmds.some((c) => c.pass.down || c.shoot.down || c.through.down || c.lob.down) || (G.replay.t > 0.4 && input.touch.latched.size))) endReplay();

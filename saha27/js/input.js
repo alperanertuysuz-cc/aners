@@ -19,11 +19,12 @@ export class Input {
     this.pausePressed = false;
     this.enabled = true;
     this.padPrev = [{}, {}];
+    this.padHold = [false, false];
     window.addEventListener('keydown', (e) => {
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) return;
       if (this.capture && this.isGameKey(e.code)) e.preventDefault();
       if (!e.repeat) { this.keys.add(e.code); this.latched.add(e.code); }
-      if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) this.pausePressed = true;
+      if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat && this.capture) this.pausePressed = true;
     });
     window.addEventListener('keyup', (e) => { this.keys.delete(e.code); });
     window.addEventListener('blur', () => { this.keys.clear(); });
@@ -55,11 +56,15 @@ export class Input {
     const gp = list[i];
     if (!gp) return false;
     const b = (k) => !!(gp.buttons[k] && (gp.buttons[k].pressed || gp.buttons[k].value > 0.5));
+    // after a reset, buttons still held from a menu press are ignored until released
+    if (this.padHold[i]) { if (gp.buttons.some((x) => x.pressed)) { const prev = this.padPrev[i]; prev.lb = b(4); prev.start = b(9); } else this.padHold[i] = false; }
+    const held = this.padHold[i];
     let ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
     const l = Math.hypot(ax, ay);
     if (l < 0.22) { ax = 0; ay = 0; } else { const k = Math.min(1, (l - 0.22) / 0.7) / l; ax *= k; ay *= k; }
     if (b(14)) ax = -1; if (b(15)) ax = 1; if (b(12)) ay = -1; if (b(13)) ay = 1;
     raw.sx += ax; raw.sy += -ay;
+    if (held) return true;
     raw.pass ||= b(0); raw.shoot ||= b(1); raw.lob ||= b(2); raw.through ||= b(3);
     raw.sprint ||= b(7) || b(5);
     const prev = this.padPrev[i];
@@ -123,6 +128,8 @@ export class Input {
 
   reset() {
     this.keys.clear(); this.latched.clear();
+    this.pausePressed = false;
+    this.padHold = [true, true];
     for (const c of this.cmds) { c.sw = false; c.pause = false; for (const b of BTNS) Object.assign(c[b], mkBtn()); }
     this.touch.btn = {};
   }

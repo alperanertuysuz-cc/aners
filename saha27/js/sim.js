@@ -226,9 +226,24 @@ export class Match {
   switchTo(h, p, silent) {
     if (h.p === p) return;
     if (h.p) h.p.human = -1;
+    for (const o of this.humans) if (o !== h && o.p === p) o.p = null;
     h.p = p; p.human = h.id; h.lastSwitch = this.t; h.queued = null;
     p.plan = null;
     if (!silent) this.emit({ type: 'switch', h: h.id, p });
+  }
+
+  // first human of the restarting team takes it; the first human of the other team gets `defP` (keeper on penalties)
+  assignRestart(teamIdx, taker, defP) {
+    let gotT = false, gotD = false;
+    for (const h of this.humans) {
+      if (h.team === teamIdx && !gotT) { gotT = true; this.switchTo(h, taker, true); }
+      else if (h.team !== teamIdx && defP && !gotD) { gotD = true; this.switchTo(h, defP, true); }
+    }
+    for (const h of this.humans) {
+      const p = h.p;
+      if (p && (p === taker || p === defP)) continue;
+      if (!p || p.off || p.isGK) { if (p) p.human = -1; h.p = null; this.pickHumanPlayer(h); }
+    }
   }
 
   kickoffLayout(T, kicking) {
@@ -274,10 +289,7 @@ export class Match {
     this.koTeam = teamIdx;
     this.kickoffLayout(this.teams[1 - teamIdx], false);
     this.koTaker = this.kickoffLayout(this.teams[teamIdx], true);
-    for (const h of this.humans) {
-      if (h.team === teamIdx) this.switchTo(h, this.koTaker, true);
-      else { h.p && (h.p.human = -1); h.p = null; this.pickHumanPlayer(h); }
-    }
+    this.assignRestart(teamIdx, this.koTaker, null);
     this.koAIT = 1.1 + this.rand() * 0.5;
     this.emit({ type: 'kickoffReady', team: teamIdx });
   }
@@ -597,7 +609,7 @@ export class Match {
     const sp = hyp(vx, vy, vz);
     this.emit({ type: 'kick', p, kind, power: sp });
     // offside snapshot
-    if (this.cfg.offside && !this.walls && kind !== 'throw' && kind !== 'goalkick' && !this.noOffsideKick) {
+    if (this.cfg.offside && !this.walls && this.cfg.mode !== 'practice' && kind !== 'throw' && kind !== 'goalkick' && !this.noOffsideKick) {
       const T = p.T, line = this.offsideLine(T);
       const set = new Set();
       for (const m of T.players) if (!m.off && m !== p && m.x * T.side > line + 0.25 && m.x * T.side > 0) set.add(m);
@@ -1128,6 +1140,7 @@ export class Match {
   // -------------------------------------------------------------- dead balls / set pieces
   deadBall(sp) {
     if (this.state !== 'play' && this.state !== 'setwait') return;
+    if (this.cfg.mode === 'practice') { this.practiceReset(); return; }
     this.state = 'dead'; this.stateT = 0; this.pendingSP = sp; this.fadeSent = false;
     const B = this.ball;
     if (B.owner) { B.vx = B.owner.vx * 0.6; B.vz = B.owner.vz * 0.6; }
@@ -1268,10 +1281,7 @@ export class Match {
     if (sp.type === 'throw') { B.throwIn = true; taker.st = 'throw'; taker.stT = 0; taker.stDur = 999; }
     B.owner = taker; B.last = taker; B.lastTeam = taker.team;
     if (sp.type === 'throw') { B.x = taker.x; B.z = taker.z; B.y = 2.1; }
-    for (const h of this.humans) {
-      if (h.team === att.idx) this.switchTo(h, taker, true);
-      else { const cur = h.p; if (!cur || cur.off || cur.isGK) this.pickHumanPlayer(h); }
-    }
+    this.assignRestart(att.idx, taker, null);
     this.possSoft = att.idx;
     this.spAIT = 0.9 + this.rand() * 0.9;
     this.emit({ type: 'fadein' });
@@ -1465,6 +1475,7 @@ export class Match {
     if (this.cfg.mode !== 'match') return;
     const hs = this.cfg.halfSeconds;
     if (this.clock < hs) return;
+    if (this.t < (this.penLiveUntil || 0)) return;
     const B = this.ball, P = this.P;
     const danger = Math.abs(B.x) > P.H - 25 * P.sc;
     if (!danger || this.clock > hs + 7) this.endHalf();
@@ -1491,6 +1502,7 @@ export class Match {
     for (const T of this.teams) { T.side *= -1; for (const p of T.players) p.stamina = Math.min(1, p.stamina + 0.35); }
     this.emit({ type: 'secondHalf' });
     this.setupKickoff(1 - this.firstKick);
+    this.emit({ type: 'fadein' });
   }
 
   // -------------------------------------------------------------- penalties
@@ -1533,10 +1545,7 @@ export class Match {
       }
       p.face = Math.atan2(spot.z - p.z, spot.x - p.x);
     }
-    for (const h of this.humans) {
-      if (h.team === teamIdx) this.switchTo(h, kicker, true);
-      else if (h.team === def.idx) this.switchTo(h, gk, true);
-    }
+    this.assignRestart(teamIdx, kicker, gk);
     this.emit({ type: 'penaltySetup', kicker, gk, inMatch, team: teamIdx });
   }
 
@@ -1563,7 +1572,7 @@ export class Match {
       } else if (pen.t > 1.3) {
         const r = this.rand();
         const side = this.rand() < 0.5 ? -1 : 1;
-        pen.aimZ = r < 0.12 ? (this.rand() - 0.5) * 0.8 : side * (hw - 0.45 - this.rand() * 0.9);
+        pen.aimZ = r < 0.12 ? (this.rand() - 0.5) * 0.8 : side * (hw - 0.3 - this.rand() * 0.95);
         pen.aimY = this.rand() < 0.65 ? 0.3 + this.rand() * 0.5 : 1.2 + this.rand() * 0.9;
         pen.power = 0.5 + this.rand() * 0.32 + (this.rand() < 0.08 ? 0.15 : 0);
         pen.phase = 'runup'; pen.t = 0;
@@ -1584,15 +1593,17 @@ export class Match {
       if (this.ev.post) this.emit({ type: 'post', v: this.ev.post });
       if (this.ev.net) this.emit({ type: 'net', ...this.ev.net });
       if (!pen.result) {
-        if (g.st === 'dive' || this.t > pen.kickT + 0.05) {
-          if (B.held !== g && this.penGkContact(g)) pen.result = 'save';
-        }
-        if (s * B.x > P.H + BALL_R && Math.abs(B.z) < hw && B.y < P.goalH && !pen.result) pen.result = 'goal';
-        if (!pen.result && (s * B.x > P.H + 1 || pen.t > 2.2 || (hyp(B.vx, B.vz) < 0.8 && pen.t > 0.8))) pen.result = 'miss';
+        if (B.held !== g && (g.st === 'dive' || this.t > pen.kickT + 0.05) && this.penGkContact(g)) pen.touched = true;
+        if (s * B.x > P.H + BALL_R && Math.abs(B.z) < hw && B.y < P.goalH) pen.result = 'goal';
+        else if (B.held === g) pen.result = 'save';
+        else if (s * B.x > P.H + 1 || pen.t > 1.9 || (hyp(B.vx, B.vz) < 0.8 && pen.t > 0.8) || (pen.touched && s * B.vx < -0.5 && pen.t > 0.45)) pen.result = pen.touched ? 'save' : 'miss';
         if (pen.result) this.penResult(pen);
       }
       if (pen.t > 1.75 && !pen.fadeSent && this.shootout && !this.shootout.done) { pen.fadeSent = true; this.emit({ type: 'fade', dur: 0.22 }); }
-      if (pen.t > 2.0) this.nextShootoutKick();
+      if (pen.t > 2.0) {
+        if (!pen.result) { pen.result = pen.touched ? 'save' : 'miss'; this.penResult(pen); }
+        this.nextShootoutKick();
+      }
     }
     this.movePlayers(dt);
     if (B.held) { B.x = g.x + Math.cos(g.face) * 0.3; B.z = g.z + Math.sin(g.face) * 0.3; B.y = 1.05; }
@@ -1613,7 +1624,7 @@ export class Match {
     let az = pen.aimZ, ay = pen.aimY;
     // power sweet spot .45-.82: outside gets wild
     const wild = pw > 0.85 ? (pw - 0.85) * 4 : pw < 0.25 ? (0.25 - pw) * 1.5 : 0;
-    az += this.gauss() * (0.18 + (1 - sho) * 0.45 + wild * 1.2) * (human ? 0.8 : this.teams[k.team].lvl.err * 0.8);
+    az += this.gauss() * (0.24 + (1 - sho) * 0.45 + wild * 1.2) * (human ? 0.8 : this.teams[k.team].lvl.err * 0.8);
     ay += this.gauss() * (0.12 + wild * 1.4) + (pw > 0.85 ? (pw - 0.85) * 6 : 0);
     const spd = 14 + clamp(pw, 0.2, 1) * 14 * (0.8 + 0.2 * sho);
     const gx = s * P.H, dx = gx - B.x, dz = az - B.z, d = hyp(dx, dz);
@@ -1630,7 +1641,7 @@ export class Match {
       let dz2;
       const r = this.rand();
       if (r < read) dz2 = az; else if (r < read + 0.15) dz2 = 0; else dz2 = (az > 0 ? -1 : 1) * (1.5 + this.rand() * 1.5);
-      pen.gkCommit = { z: dz2, y: clamp(ay + (this.rand() - 0.5) * 0.6, 0.3, 2.2), at: this.t + lvl.gkReact * 0.6, abs: true };
+      pen.gkCommit = { z: dz2, y: clamp(ay + (this.rand() - 0.5) * 0.6, 0.3, 2.2), at: this.t + lvl.gkReact * 0.25, abs: true };
     } else if (!pen.gkCommit) {
       const st = pen.gkStick || { x: 0, z: 0, mag: 0 };
       pen.gkCommit = { z: st.mag > 0.3 ? st.z : 0, up: st.mag > 0.3 ? Math.max(0, st.x * s) : 0, at: this.t + 0.12 };
@@ -1638,6 +1649,7 @@ export class Match {
     if (pen.inMatch) {
       // live ball after the kick
       this.state = 'play'; this.stateT = 0;
+      this.penLiveUntil = this.t + 2.8;
       this.penDive(pen, true);
       this.pen = null;
       this.emit({ type: 'penaltyKick' });
@@ -1654,6 +1666,8 @@ export class Match {
     if (Math.abs(tz - g.z) < 0.5 && ty < 1.6) { g.wvx = 0; return; }
     const tleft = pen.target ? Math.max(0.2, pen.target.t - (this.t - (pen.kickT || this.t))) : 0.5;
     this.startDive(g, tz, ty, tleft);
+    g.stT = 0.12; // keepers start moving as the kicker strikes
+
   }
 
   penGkContact(g) {

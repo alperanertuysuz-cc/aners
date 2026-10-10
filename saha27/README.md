@@ -56,7 +56,8 @@ node tools/sim-test.mjs 8 5 pro      # sokak 5v5
 node tools/human-test.mjs 6 11       # 1P/2P, penaltılar, duran toplar
 ```
 
-Son ölçüm (5 dk maç, CPU-CPU, Profesyonel): maç başı ~2 gol, ~7 şut, ~97 pas, %68 pas isabeti, 0 takılma. Sokak 5v5: ~8 gol.
+Son ölçüm (5 dk maç, CPU-CPU, Profesyonel): maç başı ~1.4 gol, ~7 şut, ~96 pas, %65 pas isabeti, 0 takılma. Sokak 5v5: ~10 gol.
+Şut dengesi (insan, boş pozisyon, merkezden): 12 m %81, 16 m %67, 20 m %5–15, 25 m %3–7 gol. Penaltı (CPU-CPU): %76 gol, %19 kurtarış, %5 aut.
 
 ## Bilinen sınırlar
 
