@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>SAHA 27</title>
+<meta name="description" content="SAHA 27: tarayıcıda çalışan ücretsiz 3D futbol oyunu. Hesap yok, indirme yok. Hızlı maç, kariyer ligi, penaltı atışları, sokak 5v5, iki oyuncu ve gamepad desteği.">
+<meta name="theme-color" content="#07090C">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..900;1,62..125,700..900&display=swap">
+<link rel="stylesheet" href="app.css">
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js" } }</script>
+</head>
+<body>
+<canvas id="gl" aria-label="Oyun sahnesi"></canvas>
+<div id="fade"></div>
+
+<!-- ============================ HUD ============================ -->
+<div id="hud" hidden>
+  <div class="bug" id="bug">
+    <div class="bug-team" id="bugH"><i></i><b></b></div>
+    <div class="bug-score"><span id="sH">0</span><span class="bug-sep"></span><span id="sA">0</span></div>
+    <div class="bug-team r" id="bugA"><b></b><i></i></div>
+    <div class="bug-clock" id="clock">00:00</div>
+  </div>
+  <div class="ticker" id="ticker" aria-live="polite"></div>
+  <div class="banner" id="banner"><div class="banner-k" id="bannerK"></div><div class="banner-s" id="bannerS"></div></div>
+  <div id="labels"></div>
+  <canvas id="radar" width="232" height="152"></canvas>
+  <div class="pcard" id="pc0"><span class="pc-n"></span><div><b class="pc-name"></b><i class="pc-st"><s></s></i></div></div>
+  <div class="pcard r" id="pc1"><span class="pc-n"></span><div><b class="pc-name"></b><i class="pc-st"><s></s></i></div></div>
+  <button class="hud-pause" id="pauseBtn" aria-label="Duraklat"><svg viewBox="0 0 24 24" width="18" height="18"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+  <div class="pen-ui" id="penUI" hidden>
+    <div class="pen-aim" id="penAim"></div>
+    <div class="pen-help" id="penHelp"></div>
+    <div class="pen-tally" id="penTally"></div>
+  </div>
+  <div class="replay-tag" id="replayTag" hidden><span></span>TEKRAR<em>atlamak için bir tuşa bas</em></div>
+  <div id="touch" class="touch" hidden></div>
+</div>
+
+<!-- ============================ SCREENS ============================ -->
+<main id="ui">
+  <section class="screen title" data-screen="title">
+    <div class="title-wrap">
+      <p class="eyebrow">Futbol · tarayıcıda · ücretsiz</p>
+      <h1 class="logo"><span>SAHA</span><em>27</em></h1>
+      <p class="title-sub">Hesap yok, indirme yok, kilitli mod yok. Stadyum hazır.</p>
+      <button class="cta" id="startBtn">Başla <kbd>Enter</kbd></button>
+    </div>
+    <p class="title-foot">Klavye · Gamepad · Dokunmatik — iki kişi aynı ekranda oynayabilir.</p>
+  </section>
+
+  <section class="screen menu" data-screen="menu">
+    <header class="m-head"><h2 class="logo sm"><span>SAHA</span><em>27</em></h2></header>
+    <nav class="m-list" aria-label="Ana menü">
+      <button class="m-item" data-go="quick"><b>Hızlı Maç</b><span>Takımını seç, sahaya çık. 1P, 2P ya da izle.</span></button>
+      <button class="m-item" data-go="career"><b>Kariyer</b><span>16 takımlı lig. Fikstür, puan tablosu, gol krallığı.</span></button>
+      <button class="m-item" data-go="street"><b>Sokak 5v5</b><span>Kafes saha, duvardan sekme, taç yok. Hızlı ve sert.</span></button>
+      <button class="m-item" data-go="pens"><b>Penaltı Atışları</b><span>Nişan al, gücü ayarla, kaleciyle göz göze.</span></button>
+      <button class="m-item" data-go="practice"><b>Antrenman</b><span>Sadece sen, top ve kaleci. Kontrolleri öğren.</span></button>
+      <div class="m-row">
+        <button class="m-mini" data-go="editor">Takım Editörü</button>
+        <button class="m-mini" data-go="settings">Ayarlar</button>
+        <button class="m-mini" data-go="controls">Kontroller</button>
+      </div>
+    </nav>
+    <aside class="m-side" id="menuSide"></aside>
+  </section>
+
+  <section class="screen setup" data-screen="setup">
+    <header class="s-head"><button class="back" data-back aria-label="Geri">←</button><h2 id="setupTitle">Hızlı Maç</h2></header>
+    <div class="vs">
+      <div class="tcard" id="tc0"></div>
+      <div class="vs-mid"><span>VS</span></div>
+      <div class="tcard" id="tc1"></div>
+    </div>
+    <div class="opts" id="setupOpts"></div>
+    <div class="s-foot"><button class="cta" id="kickoffBtn">Maça Başla</button></div>
+  </section>
+
+  <section class="screen career" data-screen="career">
+    <header class="s-head"><button class="back" data-back aria-label="Geri">←</button><h2>Kariyer</h2><div class="c-meta" id="cMeta"></div></header>
+    <div class="c-body" id="careerBody"></div>
+  </section>
+
+  <section class="screen editor" data-screen="editor">
+    <header class="s-head"><button class="back" data-back aria-label="Geri">←</button><h2>Takım Editörü</h2></header>
+    <div class="e-body"><div class="e-list" id="eList"></div><div class="e-form" id="eForm"></div></div>
+  </section>
+
+  <section class="screen settings" data-screen="settings">
+    <header class="s-head"><button class="back" data-back aria-label="Geri">←</button><h2>Ayarlar</h2></header>
+    <div class="set-body" id="setBody"></div>
+  </section>
+
+  <section class="screen controls" data-screen="controls">
+    <header class="s-head"><button class="back" data-back aria-label="Geri">←</button><h2>Kontroller</h2></header>
+    <div class="ctl-body">
+      <div class="ctl-card">
+        <h3>Klavye · tek oyuncu</h3>
+        <dl>
+          <dt>Hareket</dt><dd><kbd>W A S D</kbd> veya <kbd>Yön tuşları</kbd></dd>
+          <dt>Pas / Baskı</dt><dd><kbd>J</kbd> <kbd>Boşluk</kbd> <kbd>X</kbd></dd>
+          <dt>Şut / Müdahale</dt><dd><kbd>K</kbd> <kbd>C</kbd> — basılı tut, bırak</dd>
+          <dt>Ara pas / Yardım çağır</dt><dd><kbd>L</kbd> <kbd>V</kbd></dd>
+          <dt>Orta, havadan / Kayarak</dt><dd><kbd>I</kbd> <kbd>Z</kbd></dd>
+          <dt>Sprint</dt><dd><kbd>Shift</kbd></dd>
+          <dt>Oyuncu değiştir</dt><dd><kbd>Q</kbd> <kbd>E</kbd></dd>
+          <dt>Duraklat</dt><dd><kbd>Esc</kbd> <kbd>P</kbd></dd>
+        </dl>
+      </div>
+      <div class="ctl-card">
+        <h3>Gamepad</h3>
+        <dl>
+          <dt>Hareket</dt><dd>Sol analog / D-pad</dd>
+          <dt>Pas / Baskı</dt><dd><kbd>A</kbd> <kbd>✕</kbd></dd>
+          <dt>Şut / Müdahale</dt><dd><kbd>B</kbd> <kbd>◯</kbd></dd>
+          <dt>Ara pas / Yardım</dt><dd><kbd>Y</kbd> <kbd>△</kbd></dd>
+          <dt>Orta / Kayarak</dt><dd><kbd>X</kbd> <kbd>▢</kbd></dd>
+          <dt>Sprint</dt><dd><kbd>RT</kbd> <kbd>R2</kbd></dd>
+          <dt>Oyuncu değiştir</dt><dd><kbd>LB</kbd> <kbd>L1</kbd></dd>
+          <dt>Duraklat</dt><dd><kbd>Start</kbd></dd>
+        </dl>
+      </div>
+      <div class="ctl-card">
+        <h3>Klavye · iki oyuncu</h3>
+        <dl>
+          <dt>1. oyuncu</dt><dd><kbd>W A S D</kbd> · Pas <kbd>F</kbd> · Şut <kbd>G</kbd> · Ara <kbd>H</kbd> · Orta <kbd>T</kbd> · Sprint <kbd>Sol Shift</kbd> · Değiştir <kbd>R</kbd></dd>
+          <dt>2. oyuncu</dt><dd><kbd>Yön tuşları</kbd> · Pas <kbd>Num1</kbd>/<kbd>,</kbd> · Şut <kbd>Num2</kbd>/<kbd>.</kbd> · Ara <kbd>Num3</kbd>/<kbd>/</kbd> · Orta <kbd>Num5</kbd>/<kbd>;</kbd> · Sprint <kbd>Num0</kbd>/<kbd>Sağ Shift</kbd> · Değiştir <kbd>Num4</kbd>/<kbd>'</kbd></dd>
+          <dt>Gamepad</dt><dd>1. gamepad 1. oyuncuya, 2. gamepad 2. oyuncuya bağlanır.</dd>
+        </dl>
+      </div>
+      <div class="ctl-card">
+        <h3>İpuçları</h3>
+        <ul>
+          <li>Top sana gelmeden pas ya da şut tuşunu bırakırsan <b>ilk dokunuşta</b> vurursun.</li>
+          <li>Şut gücü: çubuk dolarken bırak. Kırmızıya taşarsa top auta gider.</li>
+          <li>Şut yaparken yön tuşu kaleyi hangi köşeye nişanladığını belirler.</li>
+          <li>Savunmada pas tuşunu basılı tut: oyuncun topa doğru yön verir, kaleyi kapatır.</li>
+          <li>Kayarak müdahaleyi arkadan yaparsan faul ve kart gelir.</li>
+          <li>Penaltıda kaleciyken yönü tut, vuruş anında aksiyon tuşuna bas.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen overlay pause" data-screen="pause">
+    <div class="ov-card">
+      <h2>Duraklatıldı</h2>
+      <div class="ov-score" id="pauseScore"></div>
+      <div class="ov-btns">
+        <button class="cta" data-act="resume">Devam</button>
+        <button class="ghost" data-act="cam">Kamera: <b id="camName">Yayın</b></button>
+        <button class="ghost" data-act="controls">Kontroller</button>
+        <button class="ghost" data-act="settings">Ayarlar</button>
+        <button class="ghost danger" data-act="quit">Maçtan çık</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen overlay stats" data-screen="stats">
+    <div class="ov-card wide">
+      <p class="eyebrow" id="stEyebrow">Devre arası</p>
+      <div class="st-score" id="stScore"></div>
+      <div class="st-goals" id="stGoals"></div>
+      <div class="st-table" id="stTable"></div>
+      <div class="st-motm" id="stMotm"></div>
+      <div class="ov-btns row" id="stBtns"></div>
+    </div>
+  </section>
+
+  <section class="screen loading" data-screen="loading"><div class="spinner"></div><p>Stadyum ışıkları yanıyor…</p></section>
+</main>
+
+<div class="rotate-hint" id="rotateHint" hidden><div>Telefonu yan çevir<br><small>Yatay ekranda saha daha geniş görünür.</small><button class="ghost" id="rotateOk">Yine de devam</button></div></div>
+<noscript><p class="nojs">SAHA 27 için JavaScript gerekli.</p></noscript>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
